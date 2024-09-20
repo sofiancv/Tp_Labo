@@ -8,7 +8,7 @@ Created on Fri Sep 20 14:08:46 2024
 #%% Import y datos crudos
 import pandas as pd
 from inline_sql import sql,sql_val
-carpeta="""/home/Estudiante/Escritorio/TP/"""
+carpeta="C:\\Users\\emili\\OneDrive\\Desktop\\Tp_labo\\"
 
 datos_basicos=pd.read_csv(carpeta+"lista-sedes.csv")
 datos_completos=pd.read_csv(carpeta+"Datos_sedes_completos.csv")
@@ -22,5 +22,62 @@ datos_basicos=sql^ """SELECT DISTINCT sede_id, sede_desc_castellano ,pais_castel
 datos_completos=sql^ """SELECT DISTINCT sede_id, region_geografica , redes_sociales FROM datos_completos"""
 
 datos_secciones=sql^ """SELECT DISTINCT sede_id, sede_desc_castellano AS sede_sec, tipo_seccion FROM datos_secciones"""
+
+#seteamos las claves
+datos_basicos.set_index(keys='sede_id',inplace=True)
+datos_completos.set_index(keys='sede_id',inplace=True)
+datos_secciones.set_index(['sede_id','sede_sec'],inplace=True)
+
+#%% Tratamiento de nulls
+#rellenamos los valores None por el separador
+datos_completos=datos_completos.fillna(value="//")
+#%% Separando la lista anidada
+#proximo df para separar las redes sociales
+
+indexes=[]
+redes=[]
+for index,row in datos_completos.iterrows():
+   
+   lista=datos_completos.loc[index]['redes_sociales']
+   longitud=len(lista)
+   posicion_actual=0
+   red=""
+   en_red=True
+   
+   while  posicion_actual<longitud:
+       if not (en_red and (longitud-posicion_actual>2)):
+           if (lista[posicion_actual]=="/" and lista[posicion_actual+1]=="/"):
+               en_red=True    
+               posicion_actual+=4
+           
+       if ((lista[0]!="/") and en_red and posicion_actual<longitud): #equivalente a ser None
+           
+           if (lista[posicion_actual] == " "): #fin url
+               indexes.append(index) 
+               redes.append(red)
+               red=""
+               en_red=False
+           else:
+               red+=lista[posicion_actual]
+       posicion_actual+=1
+       
+dict_sede_red_social={'index': indexes ,'redes' : redes}
+
+df_sedes_redes=pd.DataFrame(dict_sede_red_social)    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
