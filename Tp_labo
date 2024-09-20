@@ -1,0 +1,26 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Sep 20 14:08:46 2024
+
+@author: Estudiante
+"""
+#%% Import y datos crudos
+import pandas as pd
+from inline_sql import sql,sql_val
+carpeta="""/home/Estudiante/Escritorio/TP/"""
+
+datos_basicos=pd.read_csv(carpeta+"lista-sedes.csv")
+datos_completos=pd.read_csv(carpeta+"Datos_sedes_completos.csv")
+#arreglamos la linea 16 manualmente
+datos_secciones=pd.read_csv(carpeta+"Datos_sedes_secciones.csv")
+
+#%% Filtrado
+
+datos_basicos=sql^ """SELECT DISTINCT sede_id, sede_desc_castellano ,pais_castellano, sede_tipo FROM datos_basicos """
+
+datos_completos=sql^ """SELECT DISTINCT sede_id, region_geografica , redes_sociales FROM datos_completos"""
+
+datos_secciones=sql^ """SELECT DISTINCT sede_id, sede_desc_castellano AS sede_sec, tipo_seccion FROM datos_secciones"""
+
+
