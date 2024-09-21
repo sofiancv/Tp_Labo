@@ -32,36 +32,34 @@ datos_secciones.set_index(['sede_id','sede_sec'],inplace=True)
 #rellenamos los valores None por el separador
 datos_completos=datos_completos.fillna(value="//")
 #%% Separando la lista anidada
-#proximo df para separar las redes sociales
 
-indexes=[]
-redes=[]
+indexes=[] #futuras columnas del df
+redes=[]  #futuras columnas del df
 for index,row in datos_completos.iterrows():
-   
    lista=datos_completos.loc[index]['redes_sociales']
-   longitud=len(lista)
-   posicion_actual=0
-   red=""
-   en_red=True
+   longitud=len(lista) #longitud del la lista anidada a la relacion datos completos
+   posicion_actual=0 #posicion de los caracteres
+   red="" #url de la red actual
+   en_red=True #esta leyendo un caracter perteneciente a una Url valida
    
    while  posicion_actual<longitud:
-       if not (en_red and (longitud-posicion_actual>2)):
+       if not (en_red and (longitud-posicion_actual>2)): #tratamiento del separador
            if (lista[posicion_actual]=="/" and lista[posicion_actual+1]=="/"):
                en_red=True    
-               posicion_actual+=4
+               posicion_actual+=4 
+       #primero se pregunta si no es null, luego si esta en una url valida y luego si es una posicion valida del string    
+       if ((lista[0]!="/") and en_red and posicion_actual<longitud):
            
-       if ((lista[0]!="/") and en_red and posicion_actual<longitud): #equivalente a ser None
-           
-           if (lista[posicion_actual] == " "): #fin url
-               indexes.append(index) 
-               redes.append(red)
-               red=""
-               en_red=False
+           if (lista[posicion_actual] == " "): #el espacio es el fin de una url
+               indexes.append(index) #se guarda una copia del index al que pertenece la red 
+               redes.append(red) #la url de la red
+               red="" #inicializa una nueva red
+               en_red=False #avisa que ya no esta mirando un caracter valido de url
            else:
-               red+=lista[posicion_actual]
+               red+=lista[posicion_actual] #copiado de la url
        posicion_actual+=1
-       
-dict_sede_red_social={'index': indexes ,'redes' : redes}
+#armado del dataframe       
+dict_sede_red_social={'index': indexes ,'redes' : redes} 
 
 df_sedes_redes=pd.DataFrame(dict_sede_red_social)    
 
