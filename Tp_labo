@@ -23,11 +23,6 @@ datos_completos=sql^ """SELECT DISTINCT sede_id, region_geografica , redes_socia
 
 datos_secciones=sql^ """SELECT DISTINCT sede_id, sede_desc_castellano AS sede_sec, tipo_seccion FROM datos_secciones"""
 
-#seteamos las claves
-datos_basicos.set_index(keys='sede_id',inplace=True)
-datos_completos.set_index(keys='sede_id',inplace=True)
-datos_secciones.set_index(['sede_id','sede_sec'],inplace=True)
-
 #%% Tratamiento de nulls
 #rellenamos los valores None por el separador
 datos_completos=datos_completos.fillna(value="//")
@@ -36,12 +31,18 @@ datos_completos=datos_completos.fillna(value="//")
 indexes=[] #futuras columnas del df
 redes=[]  #futuras columnas del df
 for index,row in datos_completos.iterrows():
+   
+    
    lista=datos_completos.loc[index]['redes_sociales']
-   longitud=len(lista) #longitud del la lista anidada a la relacion datos completos
    posicion_actual=0 #posicion de los caracteres
+   longitud=len(lista) #longitud del la lista anidada a la relacion datos completos
    red="" #url de la red actual
    en_red=True #esta leyendo un caracter perteneciente a una Url valida
    
+   
+   while lista[posicion_actual]==" ": #Url empezada en espacio
+       posicion_actual+=1
+       
    while  posicion_actual<longitud:
        if not (en_red and (longitud-posicion_actual>2)): #tratamiento del separador
            if (lista[posicion_actual]=="/" and lista[posicion_actual+1]=="/"):
@@ -50,20 +51,29 @@ for index,row in datos_completos.iterrows():
        #primero se pregunta si no es null, luego si esta en una url valida y luego si es una posicion valida del string    
        if ((lista[0]!="/") and en_red and posicion_actual<longitud):
            
-           if (lista[posicion_actual] == " "): #el espacio es el fin de una url
-               indexes.append(index) #se guarda una copia del index al que pertenece la red 
+           if ((lista[posicion_actual] == " ") and
+               (lista[posicion_actual+1] == " ") and
+               (lista[posicion_actual+2] == "/")): #fin url
+               
+               indexes.append(datos_completos.iloc[index]['sede_id']) #se guarda una copia del index al que pertenece la red 
                redes.append(red) #la url de la red
                red="" #inicializa una nueva red
                en_red=False #avisa que ya no esta mirando un caracter valido de url
+           
            else:
-               red+=lista[posicion_actual] #copiado de la url
+               if lista[posicion_actual]==" ":
+                   red+="%20" #las url no soportan espacios, asi que se codifican
+               
+               else:
+                   red+=lista[posicion_actual]
        posicion_actual+=1
 #armado del dataframe       
 dict_sede_red_social={'index': indexes ,'redes' : redes} 
 
-df_sedes_redes=pd.DataFrame(dict_sede_red_social)    
-
-
+df_sedes_redes=pd.DataFrame(dict_sede_red_social)
+    
+#%%
+chequeo=sql^ """SELECT DISTINCT * FROM datos_completos WHERE sede_id='CSCRS'"""
 
 
 
