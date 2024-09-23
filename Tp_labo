@@ -8,12 +8,11 @@ Created on Fri Sep 20 14:08:46 2024
 #%% Import y datos crudos
 import pandas as pd
 from inline_sql import sql,sql_val
-carpeta="C:\\Users\\emili\\OneDrive\\Desktop\\Tp_labo\\"
 
-datos_basicos=pd.read_csv(carpeta+"lista-sedes.csv")
-datos_completos=pd.read_csv(carpeta+"Datos_sedes_completos.csv")
+datos_basicos=pd.read_csv(".\\lista-sedes.csv")
+datos_completos=pd.read_csv(".\\Datos_sedes_completos.csv")
 #arreglamos la linea 16 manualmente
-datos_secciones=pd.read_csv(carpeta+"Datos_sedes_secciones.csv")
+datos_secciones=pd.read_csv(".\\Datos_sedes_secciones.csv")
 
 #%% Filtrado
 
@@ -33,11 +32,11 @@ redes=[]  #futuras columnas del df
 for index,row in datos_completos.iterrows():
    
     
-   lista=datos_completos.loc[index]['redes_sociales']
-   posicion_actual=0 #posicion de los caracteres
-   longitud=len(lista) #longitud del la lista anidada a la relacion datos completos
-   red="" #url de la red actual
-   en_red=True #esta leyendo un caracter perteneciente a una Url valida
+   lista : str =datos_completos.loc[index]['redes_sociales']
+   posicion_actual : int=0 #posicion de los caracteres
+   longitud : int=len(lista) #longitud del la lista anidada a la relacion datos completos
+   red : str="" #url de la red actual
+   en_red : bool=True #esta leyendo un caracter perteneciente a una Url valida
    
    
    while lista[posicion_actual]==" ": #Url empezada en espacio
@@ -46,7 +45,7 @@ for index,row in datos_completos.iterrows():
    while  posicion_actual<longitud:
        if not (en_red and (longitud-posicion_actual>2)): #tratamiento del separador
            if (lista[posicion_actual]=="/" and lista[posicion_actual+1]=="/"):
-               en_red=True    
+               en_red : bool=True    
                posicion_actual+=4 
        #primero se pregunta si no es null, luego si esta en una url valida y luego si es una posicion valida del string    
        if ((lista[0]!="/") and en_red and posicion_actual<longitud):
@@ -68,12 +67,11 @@ for index,row in datos_completos.iterrows():
                    red+=lista[posicion_actual]
        posicion_actual+=1
 #armado del dataframe       
-dict_sede_red_social={'index': indexes ,'redes' : redes} 
+dict_sede_red_social : dict={'index': indexes ,'redes' : redes} 
 
 df_sedes_redes=pd.DataFrame(dict_sede_red_social)
     
-#%%
-chequeo=sql^ """SELECT DISTINCT * FROM datos_completos WHERE sede_id='CSCRS'"""
+
 
 
 
