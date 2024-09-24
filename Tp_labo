@@ -3,7 +3,7 @@
 """
 Created on Fri Sep 20 14:08:46 2024
 
-@author: Estudiante
+@author: Emiliano Torres, Matilda Bartoli y Sofia Copaga
 """
 #%% Import y datos crudos
 import pandas as pd
@@ -36,7 +36,7 @@ datos_migraciones.rename(columns={'Country Origin Code': 'origen',
                           
                           
 
-datos_migraciones=sql^ """SELECT DISTINCT destino, casos FROM datos_migraciones WHERE origen='ARG' AND genero='TOT'"""
+datos_migraciones=sql^ """SELECT DISTINCT origen, destino, casos FROM datos_migraciones WHERE (origen='ARG' OR destino='ARG') AND genero='TOT'"""
 #%% Tratamiento de nulls
 #rellenamos los valores None por el separador
 datos_completos=datos_completos.fillna(value="//")
@@ -94,22 +94,22 @@ redes=pd.DataFrame(dict_sede_red_social)
     
 #%% Contruimos base de datos segun el der
 """
-Paises(*codigo*,flujo)
+Paises(*origen*,*destino*,flujo)
 
-df(paises)={codigo->flujo}
-pk(paises)={codigo}
+df(paises)={{origen,destino}->flujo}
+pk(paises)={origen,destino}
 fk(paises)={}
 
 Sedes(*sede_id*,pais_iso_3,pais,region_geografica,sede_desc,sede_tipo)
 
 df(sedes)={sede_id->pais,pais_iso3->pais, pais->region_geografica,sede_id->sede_desc, sede_id->sede_tipo}
 #Notar que no esta 3FN
-pk(sedes)={codigo}
+pk(sedes)={sede_id}
 fk(paises)={}
 
 redes(*sede_id*,*red*)
-pk(redes)={codigo,red}
-fk(redes)={codigo}
+pk(redes)={sede_id,red}
+fk(redes)={sede_id}
 
 Seccion(*sede_id*,*sede_sec*,tipo_seccion)
 df(Seccion)={{sede_id,sede_sec}->tipo_seccion}
@@ -122,12 +122,48 @@ paises= datos_migraciones
 sedes=sql^ """SELECT DISTINCT db.sede_id, db.sede_desc_castellano, db.pais_iso_3 ,db.pais_castellano AS pais, dc.region_geografica, db.sede_tipo 
           FROM datos_basicos AS db INNER JOIN datos_completos AS dc ON db.sede_id=dc.sede_id"""
 secciones=sql^ """SELECT DISTINCT ds.sede_id, ds.sede_sec, ds.tipo_seccion FROM datos_secciones AS ds """
-#Notar que solo 105 sedes tiene secciones, Por eso entiendo que no es entidad debil
+#Notar que solo 105 sedes tiene secciones que pertenecen a 164 sedes. 
+#Por eso entiendo que no es entidad debil
 #Ya que las entidades debiles necesitan relaciones totales
 #%% lo llevamos todo a 3FN
 codigos_paises=sql^"""SELECT DISTINCT pais_iso_3, pais FROM sedes"""
 ubicacion=sql^"""SELECT DISTINCT pais_iso_3, region_geografica FROM sedes"""
 sedes=sql^"""SELECT DISTINCT sede_id,sede_desc_castellano,pais_iso_3,sede_tipo FROM sedes"""
 
+
+"""
+diagrama relacional pos modificaciones
+Paises(*origen*,*destino*,flujo)
+
+df(paises)={{origen,destino}->flujo}
+pk(paises)={origen,destino}
+fk(paises)={}
+
+Sedes(*sede_id*,pais_iso_3,sede_desc,sede_tipo)
+
+df(sedes)={sede_id->pais,sede_id->sede_desc, sede_id->sede_tipo}
+pk(sedes)={sede_id}
+fk(sedes)={}
+
+redes(*sede_id*,*red*)
+pk(redes)={sede_id,red}
+fk(redes)={sede_id}
+
+Seccion(*sede_id*,*sede_sec*,tipo_seccion)
+df(Seccion)={{sede_id,sede_sec}->tipo_seccion}
+pk(Seccion)={sede_id,sede_sec}
+fk(Seccion)={sede_id}
+
+codigos_paises(*pais_iso_3*,pais)
+df(codigos_paises)={pais_iso_3->pais}
+pk(codigos_paises)={pais_iso_3}
+fk(codigos_paises)={pais_iso_3}
+
+ubicacion(*pais_iso_3*,region_geografica)
+df(ubicacion)={pais_iso_3->region_geografica}
+pk(ubicacion)={pais_iso_3}
+fk(ubicacion)={pais_iso_3}
+
+"""
 
 
