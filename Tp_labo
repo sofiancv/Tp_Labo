@@ -8,23 +8,44 @@ Created on Fri Sep 20 14:08:46 2024
 #%% Import y datos crudos
 import pandas as pd
 from inline_sql import sql,sql_val
-
+#datos sedes
 datos_basicos=pd.read_csv(".\\lista-sedes.csv")
 datos_completos=pd.read_csv(".\\Datos_sedes_completos.csv")
 #arreglamos la linea 16 manualmente
 datos_secciones=pd.read_csv(".\\Datos_sedes_secciones.csv")
 
+#datos migraciones
+datos_migraciones=pd.read_csv(".\\datos_migraciones.csv")
+
 #%% Filtrado
 
-datos_basicos=sql^ """SELECT DISTINCT sede_id, sede_desc_castellano ,pais_castellano, sede_tipo FROM datos_basicos """
+datos_basicos=sql^ """SELECT DISTINCT sede_id, sede_desc_castellano ,pais_iso_3,pais_castellano, sede_tipo FROM datos_basicos """
 
 datos_completos=sql^ """SELECT DISTINCT sede_id, region_geografica , redes_sociales FROM datos_completos"""
 
 datos_secciones=sql^ """SELECT DISTINCT sede_id, sede_desc_castellano AS sede_sec, tipo_seccion FROM datos_secciones"""
 
+
+#renombramos porque tienen espacios los nombres
+#renombramos porque tienen espacios los nombres
+
+datos_migraciones.rename(columns={'Country Origin Code': 'origen',
+                          'Migration by Gender Code': 'genero',
+                          'Country Dest Code':'destino',
+                          '2000 [2000]':'casos'},inplace=True)
+                          
+                          
+
+datos_migraciones=sql^ """SELECT DISTINCT destino, casos FROM datos_migraciones WHERE origen='ARG' AND genero='TOT'"""
 #%% Tratamiento de nulls
 #rellenamos los valores None por el separador
 datos_completos=datos_completos.fillna(value="//")
+
+#Remplazamos los nulls expresados como .. por 0
+null_migraciones=datos_migraciones[datos_migraciones['casos']=='..']
+for index,rows in null_migraciones.iterrows():
+    datos_migraciones.loc[index,'casos']=0
+
 #%% Separando la lista anidada
 
 indexes=[] #futuras columnas del df
@@ -43,7 +64,7 @@ for index,row in datos_completos.iterrows():
        posicion_actual+=1
        
    while  posicion_actual<longitud:
-       if not (en_red and (longitud-posicion_actual>2)): #tratamiento del separador
+       if (not en_red and (longitud-posicion_actual>2)): #tratamiento del separador
            if (lista[posicion_actual]=="/" and lista[posicion_actual+1]=="/"):
                en_red : bool=True    
                posicion_actual+=4 
@@ -53,9 +74,9 @@ for index,row in datos_completos.iterrows():
            if ((lista[posicion_actual] == " ") and
                (lista[posicion_actual+1] == " ") and
                (lista[posicion_actual+2] == "/")): #fin url
-               
-               indexes.append(datos_completos.iloc[index]['sede_id']) #se guarda una copia del index al que pertenece la red 
-               redes.append(red) #la url de la red
+               if not red in redes: #hay redes repetidas
+                   indexes.append(datos_completos.iloc[index]['sede_id']) #se guarda una copia del index al que pertenece la red 
+                   redes.append(red) #la url de la red
                red="" #inicializa una nueva red
                en_red=False #avisa que ya no esta mirando un caracter valido de url
            
@@ -69,21 +90,44 @@ for index,row in datos_completos.iterrows():
 #armado del dataframe       
 dict_sede_red_social : dict={'index': indexes ,'redes' : redes} 
 
-df_sedes_redes=pd.DataFrame(dict_sede_red_social)
+redes=pd.DataFrame(dict_sede_red_social)
     
+#%% Contruimos base de datos segun el der
+"""
+Paises(*codigo*,flujo)
 
+df(paises)={codigo->flujo}
+pk(paises)={codigo}
+fk(paises)={}
 
+Sedes(*sede_id*,pais_iso_3,pais,region_geografica,sede_desc,sede_tipo)
 
+df(sedes)={sede_id->pais,pais_iso3->pais, pais->region_geografica,sede_id->sede_desc, sede_id->sede_tipo}
+#Notar que no esta 3FN
+pk(sedes)={codigo}
+fk(paises)={}
 
+redes(*sede_id*,*red*)
+pk(redes)={codigo,red}
+fk(redes)={codigo}
 
+Seccion(*sede_id*,*sede_sec*,tipo_seccion)
+df(Seccion)={{sede_id,sede_sec}->tipo_seccion}
+pk(Seccion)={sede_id,sede_sec}
+fk(Seccion)={sede_id}
 
-
-
-
-
-
-
-
+"""
+#redes lo armamos en la celda anterior
+paises= datos_migraciones
+sedes=sql^ """SELECT DISTINCT db.sede_id, db.sede_desc_castellano, db.pais_iso_3 ,db.pais_castellano AS pais, dc.region_geografica, db.sede_tipo 
+          FROM datos_basicos AS db INNER JOIN datos_completos AS dc ON db.sede_id=dc.sede_id"""
+secciones=sql^ """SELECT DISTINCT ds.sede_id, ds.sede_sec, ds.tipo_seccion FROM datos_secciones AS ds """
+#Notar que solo 105 sedes tiene secciones, Por eso entiendo que no es entidad debil
+#Ya que las entidades debiles necesitan relaciones totales
+#%% lo llevamos todo a 3FN
+codigos_paises=sql^"""SELECT DISTINCT pais_iso_3, pais FROM sedes"""
+ubicacion=sql^"""SELECT DISTINCT pais_iso_3, region_geografica FROM sedes"""
+sedes=sql^"""SELECT DISTINCT sede_id,sede_desc_castellano,pais_iso_3,sede_tipo FROM sedes"""
 
 
 
