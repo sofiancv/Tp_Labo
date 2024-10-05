@@ -1,11 +1,12 @@
+#%% Import y datos crudos
 #!/usr/bin/env python3
+
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Sep 20 14:08:46 2024
+"""Created on Fri Sep 20 14:08:46 2024
 
 @author: Emiliano Torres, Matilda Bartoli y Sofia Copaga
 """
-#%% Import y datos crudos
+
 import pandas as pd
 from inline_sql import sql,sql_val
 #datos sedes
@@ -19,32 +20,57 @@ datos_migraciones=pd.read_csv(".\\datos_migraciones.csv")
 
 #%% Filtrado
 
-datos_basicos=sql^ """SELECT DISTINCT sede_id, sede_desc_castellano ,pais_iso_3,pais_castellano, sede_tipo FROM datos_basicos """
+datos_basicos=sql^ """SELECT DISTINCT sede_id, pais_iso_3, pais_castellano,sede_tipo 
+                      FROM datos_basicos """
 
 datos_completos=sql^ """SELECT DISTINCT sede_id, region_geografica , redes_sociales FROM datos_completos"""
 
-datos_secciones=sql^ """SELECT DISTINCT sede_id, sede_desc_castellano AS sede_sec, tipo_seccion FROM datos_secciones"""
+datos_secciones=sql^ """SELECT DISTINCT sede_id,COUNT(tipo_seccion) as seccion FROM datos_secciones GROUP BY sede_id"""
 
+datos_basicos=sql^ """SELECT s.sede_id, s.pais_iso_3, 
+                      s.pais_castellano,s.sede_tipo, sec.seccion 
+                      FROM datos_basicos AS s LEFT OUTER JOIN datos_secciones AS sec ON s.sede_id=sec.sede_id"""
 
-#renombramos porque tienen espacios los nombres
 #renombramos porque tienen espacios los nombres
 
 datos_migraciones.rename(columns={'Country Origin Code': 'origen',
                           'Migration by Gender Code': 'genero',
                           'Country Dest Code':'destino',
-                          '2000 [2000]':'casos'},inplace=True)
+                          '2000 [2000]':'casos_2000',
+                          '1960 [1960]':'casos_1960',
+                          '1970 [1970]':'casos_1970',
+                          '1980 [1980]':'casos_1980',
+                          '1990 [1990]':'casos_1990'},inplace=True)
                           
                           
 
-datos_migraciones=sql^ """SELECT DISTINCT origen, destino, casos FROM datos_migraciones WHERE (origen='ARG' OR destino='ARG') AND genero='TOT'"""
+datos_migraciones=sql^ """SELECT DISTINCT origen, destino, casos_1960,casos_1970,casos_1980,casos_1990,casos_2000 
+                          FROM datos_migraciones WHERE genero='TOT'"""
 #%% Tratamiento de nulls
-#rellenamos los valores None por el separador
+#rellenamos los valores None del campo redes_sociales por el separador
 datos_completos=datos_completos.fillna(value="//")
-
+#Completamos los nulls de las sedes sin secciones
+datos_basicos=datos_basicos.fillna(value="0")
+#buscamos los .. que vamos a remplazar
+null_migraciones=datos_migraciones[(datos_migraciones['casos_1960']=='..') | (datos_migraciones['casos_1970']=='..')
+                                   |(datos_migraciones['casos_1980']=='..') | (datos_migraciones['casos_1990']=='..')
+                                   |(datos_migraciones['casos_2000']=='..')]
 #Remplazamos los nulls expresados como .. por 0
-null_migraciones=datos_migraciones[datos_migraciones['casos']=='..']
 for index,rows in null_migraciones.iterrows():
-    datos_migraciones.loc[index,'casos']=0
+    if datos_migraciones.loc[index,'casos_1960']=='..':
+        datos_migraciones.loc[index,'casos_1960']=0
+    
+    if datos_migraciones.loc[index,'casos_1970']=='..':
+        datos_migraciones.loc[index,'casos_1970']=0
+    
+    if datos_migraciones.loc[index,'casos_1980']=='..':
+        datos_migraciones.loc[index,'casos_1980']=0
+        
+    if datos_migraciones.loc[index,'casos_1990']=='..':
+        datos_migraciones.loc[index,'casos_1990']=0
+    
+    if datos_migraciones.loc[index,'casos_2000']=='..':
+        datos_migraciones.loc[index,'casos_2000']=0    
 
 #%% Separando la lista anidada
 
@@ -90,80 +116,100 @@ for index,row in datos_completos.iterrows():
 #armado del dataframe       
 dict_sede_red_social : dict={'index': indexes ,'redes' : redes} 
 
-redes=pd.DataFrame(dict_sede_red_social)
+red_social=pd.DataFrame(dict_sede_red_social)
     
 #%% Contruimos base de datos segun el der
-"""
-Paises(*origen*,*destino*,flujo)
 
-df(paises)={{origen,destino}->flujo}
-pk(paises)={origen,destino}
-fk(paises)={}
-
-Sedes(*sede_id*,pais_iso_3,pais,region_geografica,sede_desc,sede_tipo)
-
-df(sedes)={sede_id->pais,pais_iso3->pais, pais->region_geografica,sede_id->sede_desc, sede_id->sede_tipo}
-#Notar que no esta 3FN
-pk(sedes)={sede_id}
-fk(paises)={}
-
-redes(*sede_id*,*red*)
-pk(redes)={sede_id,red}
-fk(redes)={sede_id}
-
-Seccion(*sede_id*,*sede_sec*,tipo_seccion)
-df(Seccion)={{sede_id,sede_sec}->tipo_seccion}
-pk(Seccion)={sede_id,sede_sec}
-fk(Seccion)={sede_id}
-
-"""
-#redes lo armamos en la celda anterior
+#red_social lo armamos en la celda anterior
 paises= datos_migraciones
-sedes=sql^ """SELECT DISTINCT db.sede_id, db.sede_desc_castellano, db.pais_iso_3 ,db.pais_castellano AS pais, dc.region_geografica, db.sede_tipo 
-          FROM datos_basicos AS db INNER JOIN datos_completos AS dc ON db.sede_id=dc.sede_id"""
-secciones=sql^ """SELECT DISTINCT ds.sede_id, ds.sede_sec, ds.tipo_seccion FROM datos_secciones AS ds """
-#Notar que solo 105 sedes tiene secciones que pertenecen a 164 sedes. 
-#Por eso entiendo que no es entidad debil
-#Ya que las entidades debiles necesitan relaciones totales
-#%% lo llevamos todo a 3FN
+sedes=sql^ """SELECT DISTINCT db.sede_id, db.pais_iso_3 ,db.pais_castellano AS pais, 
+            dc.region_geografica, db.sede_tipo,db.seccion 
+            FROM datos_basicos AS db INNER JOIN datos_completos AS dc ON db.sede_id=dc.sede_id"""
+
+#%% Lo llevamos todo a 3FN
 codigos_paises=sql^"""SELECT DISTINCT pais_iso_3, pais FROM sedes"""
 ubicacion=sql^"""SELECT DISTINCT pais_iso_3, region_geografica FROM sedes"""
-sedes=sql^"""SELECT DISTINCT sede_id,sede_desc_castellano,pais_iso_3,sede_tipo FROM sedes"""
+sedes=sql^"""SELECT DISTINCT sede_id, pais_iso_3,sede_tipo,seccion FROM sedes"""
 
 
-"""
-diagrama relacional pos modificaciones
-Paises(*origen*,*destino*,flujo)
+#%% Ejercicios Consultas SQL i
+#contamos la cantidad de sedes argentinas en cada pais y la suma de sus sedes
+sedes_por_paises=sql^"""SELECT DISTINCT cp.pais, COUNT(s.sede_id) AS sedes,
+                            SUM(CAST(s.seccion AS INTEGER)) as secciones
+                            FROM sedes AS s
+                            INNER JOIN codigos_paises AS cp ON s.pais_iso_3=cp.pais_iso_3
+                            GROUP BY cp.pais
+                            """ 
 
-df(paises)={{origen,destino}->flujo}
-pk(paises)={origen,destino}
-fk(paises)={}
 
-Sedes(*sede_id*,pais_iso_3,sede_desc,sede_tipo)
 
-df(sedes)={sede_id->pais,sede_id->sede_desc, sede_id->sede_tipo}
-pk(sedes)={sede_id}
-fk(sedes)={}
 
-redes(*sede_id*,*red*)
-pk(redes)={sede_id,red}
-fk(redes)={sede_id}
+#calculamos el flujo de emigrantes de cada pais
+flujo_emigrantes=sql^"""SELECT cp.pais, sum(CAST(casos_2000 AS INTEGER)) AS emigrantes FROM paises AS p
+                        INNER JOIN codigos_paises cp ON cp.pais_iso_3= p.origen
+                        GROUP BY cp.pais 
+                        """
+#calculamos el flujo de emigrantes de cada pais                       
+flujo_inmigrantes=sql^"""SELECT cp.pais, sum(CAST(casos_2000 AS INTEGER)) AS inmigrantes FROM paises AS p
+                         INNER JOIN codigos_paises cp ON cp.pais_iso_3= p.destino
+                         GROUP BY cp.pais
+                        """
+#calculamos el flujo migratorio neto                        
+flujo_migratorio_neto=sql^"""SELECT DISTINCT fe.pais,fe.emigrantes-fi.inmigrantes AS neto FROM flujo_emigrantes AS fe
+                            INNER JOIN flujo_inmigrantes AS fi ON fe.pais=fi.pais """
+#Unimos todo en el resultado                            
+dataframe_resultado=sql^ """SELECT DISTINCT spp.pais,spp.sedes,spp.secciones/spp.sedes AS 'Secciones promedio',
+                            fmn.neto AS  'Flujo Migratorio Neto' FROM sedes_por_paises AS spp
+                            INNER JOIN flujo_migratorio_neto AS fmn ON spp.pais=fmn.pais
+                            ORDER BY spp.sedes DESC, spp.pais ASC"""
 
-Seccion(*sede_id*,*sede_sec*,tipo_seccion)
-df(Seccion)={{sede_id,sede_sec}->tipo_seccion}
-pk(Seccion)={sede_id,sede_sec}
-fk(Seccion)={sede_id}
+#%% Ejercicio Consultas SQL ii
 
-codigos_paises(*pais_iso_3*,pais)
-df(codigos_paises)={pais_iso_3->pais}
-pk(codigos_paises)={pais_iso_3}
-fk(codigos_paises)={pais_iso_3}
+paises_con_sedes_argentinas=sql^"""SELECT DISTINCT pais_iso_3 FROM sedes"""
+regiones=sql^ """SELECT DISTINCT u.region_geografica, count(p.pais_iso_3) AS paises FROM paises_con_sedes_argentinas AS p
+                            INNER JOIN ubicacion AS u ON u.pais_iso_3=p.pais_iso_3
+                            GROUP BY region_geografica
+                            """
+flujo_emigrantes_por_pais=sql^"""SELECT p.pais_iso_3, SUM(CAST(paises.casos_2000 AS INTEGER)) AS flujo FROM paises_con_sedes_argentinas AS p
+                                   INNER JOIN paises ON p.pais_iso_3=paises.destino WHERE paises.origen='ARG' AND p.pais_iso_3!='ARG'
+                                   GROUP BY p.pais_iso_3
+                                """
+flujo_emigrantes_por_regiones=sql^ """SELECT DISTINCT u.region_geografica, SUM(fepp.flujo) AS flujo_regional
+                                      FROM flujo_emigrantes_por_pais AS fepp
+                                      INNER JOIN ubicacion AS u ON fepp.pais_iso_3=u.pais_iso_3
+                                      GROUP BY u.region_geografica"""
+                                      
+dataframe_resultado=sql^ """SELECT DISTINCT fepg.region_geografica AS 'region geografica', 
+                            r.paises AS 'Paises Con Sedes Argentinas',
+                            fepg.flujo_regional/r.paises AS 'Promedio flujo con Argentina - Países con Sedes Argentinas'
+                            FROM flujo_emigrantes_por_regiones AS fepg INNER JOIN regiones AS r 
+                            ON r.region_geografica=fepg.region_geografica
+                            ORDER BY 'Promedio flujo con Argentina - Países con Sedes Argentinas' DESC""" 
+                            
 
-ubicacion(*pais_iso_3*,region_geografica)
-df(ubicacion)={pais_iso_3->region_geografica}
-pk(ubicacion)={pais_iso_3}
-fk(ubicacion)={pais_iso_3}
 
-"""
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
