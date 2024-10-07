@@ -114,7 +114,7 @@ for index,row in datos_completos.iterrows():
                    red+=lista[posicion_actual]
        posicion_actual+=1
 #armado del dataframe       
-dict_sede_red_social : dict={'index': indexes ,'redes' : redes} 
+dict_sede_red_social : dict={'sede_id': indexes ,'redes' : redes} 
 
 red_social=pd.DataFrame(dict_sede_red_social)
     
@@ -186,17 +186,37 @@ dataframe_resultado=sql^ """SELECT DISTINCT fepg.region_geografica AS 'region ge
                             ON r.region_geografica=fepg.region_geografica
                             ORDER BY 'Promedio flujo con Argentina - Países con Sedes Argentinas' DESC""" 
                             
+#%% Ejercicio Consultas SQL iii
+# no son todas pero hay un buen cubrimiento
+redes_por_sedes=sql^"""SELECT DISTINCT sede_id, CASE WHEN redes LIKE '%facebook%' THEN 'facebook' ELSE
+                       CASE WHEN redes LIKE '%instagram%' THEN 'instragram' ELSE 
+                       CASE WHEN redes LIKE '%twitter%' THEN 'twitter' ELSE
+                       CASE WHEN redes LIKE '%youtube%' THEN 'youtube'  END END END END AS red FROM red_social """ 
 
 
+sedes_paises=sql^"""SELECT DISTINCT cp.pais, rps.sede_id FROM redes_por_sedes AS rps
+               INNER JOIN sedes AS s ON rps.sede_id=s.sede_id  
+               INNER JOIN codigos_paises AS cp ON s.pais_iso_3=cp.pais_iso_3"""
+#Hay nulls porque no identificamos todas las redes sociales
+dataframe_resultado=sql^"""SELECT DISTINCT sp.pais, COUNT(DISTINCT rps.red) AS 'redes distintas' 
+                           FROM redes_por_sedes AS rps
+                           INNER JOIN sedes_paises AS sp ON rps.sede_id=sp.sede_id 
+                           WHERE rps.red IS NOT NULL
+                           GROUP BY sp.pais """
 
-
-
-
-
-
-
-
-
+#%% Ejercicio Consultass SQL iv
+redes_por_sedes=sql^"""SELECT DISTINCT sede_id, CASE WHEN redes LIKE '%facebook%' THEN 'facebook' ELSE
+                       CASE WHEN redes LIKE '%instagram%' THEN 'instragram' ELSE 
+                       CASE WHEN redes LIKE '%twitter%' THEN 'twitter' ELSE
+                       CASE WHEN redes LIKE '%youtube%' THEN 'youtube'  END END END END AS red, 
+                       redes AS url
+                       FROM red_social """ 
+                       
+dataframe_resultado=sql^"""SELECT DISTINCT sp.pais, rps.sede_id, rps.red, rps.url 
+                           FROM redes_por_sedes AS rps 
+                           INNER JOIN sedes_paises AS sp ON rps.sede_id=sp.sede_id
+                           WHERE rps.red IS NOT NULL 
+                           ORDER BY sp.pais ASC, rps.sede_id ASC, rps.red ASC, rps.url ASC """
 
 
 
