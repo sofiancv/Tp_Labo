@@ -133,7 +133,7 @@ sedes=sql^"""SELECT DISTINCT sede_id, pais_iso_3,sede_tipo,seccion FROM sedes"""
 
 
 #%% Ejercicios Consultas SQL i
-#contamos la cantidad de sedes argentinas en cada pais y la suma de sus sedes
+#contamos la cantidad de sedes argentinas en cada pais y la suma de sus secciones
 sedes_por_paises=sql^"""SELECT DISTINCT cp.pais, COUNT(s.sede_id) AS sedes,
                             SUM(CAST(s.seccion AS INTEGER)) as secciones
                             FROM sedes AS s
@@ -166,14 +166,17 @@ dataframe_resultado=sql^ """SELECT DISTINCT spp.pais,spp.sedes,spp.secciones/spp
 #%% Ejercicio Consultas SQL ii
 
 paises_con_sedes_argentinas=sql^"""SELECT DISTINCT pais_iso_3 FROM sedes"""
+#la cantidad de paises con sedes agrupadas por region
 regiones=sql^ """SELECT DISTINCT u.region_geografica, count(p.pais_iso_3) AS paises FROM paises_con_sedes_argentinas AS p
                             INNER JOIN ubicacion AS u ON u.pais_iso_3=p.pais_iso_3
                             GROUP BY region_geografica
                             """
+
 flujo_emigrantes_por_pais=sql^"""SELECT p.pais_iso_3, SUM(CAST(paises.casos_2000 AS INTEGER)) AS flujo FROM paises_con_sedes_argentinas AS p
                                    INNER JOIN paises ON p.pais_iso_3=paises.destino WHERE paises.origen='ARG' AND p.pais_iso_3!='ARG'
                                    GROUP BY p.pais_iso_3
                                 """
+                                
 flujo_emigrantes_por_regiones=sql^ """SELECT DISTINCT u.region_geografica, SUM(fepp.flujo) AS flujo_regional
                                       FROM flujo_emigrantes_por_pais AS fepp
                                       INNER JOIN ubicacion AS u ON fepp.pais_iso_3=u.pais_iso_3
@@ -193,7 +196,7 @@ redes_por_sedes=sql^"""SELECT DISTINCT sede_id, CASE WHEN redes LIKE '%facebook%
                        CASE WHEN redes LIKE '%twitter%' THEN 'twitter' ELSE
                        CASE WHEN redes LIKE '%youtube%' THEN 'youtube'  END END END END AS red FROM red_social """ 
 
-
+#unimos las sedes con sus respectivos paises
 sedes_paises=sql^"""SELECT DISTINCT cp.pais, rps.sede_id FROM redes_por_sedes AS rps
                INNER JOIN sedes AS s ON rps.sede_id=s.sede_id  
                INNER JOIN codigos_paises AS cp ON s.pais_iso_3=cp.pais_iso_3"""
@@ -205,13 +208,14 @@ dataframe_resultado=sql^"""SELECT DISTINCT sp.pais, COUNT(DISTINCT rps.red) AS '
                            GROUP BY sp.pais """
 
 #%% Ejercicio Consultass SQL iv
+#similar al punto anterior pero añadimos las url
 redes_por_sedes=sql^"""SELECT DISTINCT sede_id, CASE WHEN redes LIKE '%facebook%' THEN 'facebook' ELSE
                        CASE WHEN redes LIKE '%instagram%' THEN 'instragram' ELSE 
                        CASE WHEN redes LIKE '%twitter%' THEN 'twitter' ELSE
                        CASE WHEN redes LIKE '%youtube%' THEN 'youtube'  END END END END AS red, 
                        redes AS url
                        FROM red_social """ 
-                       
+#reutilizamos la tabla sedes_paises del ejercicio anterior           
 dataframe_resultado=sql^"""SELECT DISTINCT sp.pais, rps.sede_id, rps.red, rps.url 
                            FROM redes_por_sedes AS rps 
                            INNER JOIN sedes_paises AS sp ON rps.sede_id=sp.sede_id
