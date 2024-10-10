@@ -9,6 +9,7 @@
 
 import pandas as pd
 from inline_sql import sql,sql_val
+import matplotlib.pyplot as plt
 #datos sedes
 datos_basicos=pd.read_csv(".\\lista-sedes.csv")
 datos_completos=pd.read_csv(".\\Datos_sedes_completos.csv")
@@ -256,14 +257,34 @@ dataframe_resultado=sql^"""SELECT DISTINCT sp.pais, rps.sede_id, rps.red, rps.ur
                            ORDER BY sp.pais ASC, rps.sede_id ASC, rps.red ASC, rps.url ASC """
 
 
+#%%Grafico cantidad de sedes por region geografica
+#buscamos la cantidad de sedes por regiones
+sedes_por_codigo_pais=sql^ """SELECT DISTINCT pais_iso_3, COUNT(sede_id) AS cantidad_de_sedes
+                                FROM sedes GROUP BY pais_iso_3 """
 
+#agrupamos por regiones, no lo hacemos en una consulta ya que al no unir por claves se generan tuplas espureas
+#lo que modificaria el valor del count
+sedes_por_region_aux=sql^ """SELECT DISTINCT u.region_geografica, s.cantidad_de_sedes 
+                            FROM sedes_por_codigo_pais AS s 
+                            INNER JOIN ubicacion AS u
+                            ON s.pais_iso_3 = u.pais_iso_3
+                             """
+                                            
+sedes_por_region=sql^ """SELECT DISTINCT s.region_geografica, SUM(s.cantidad_de_sedes) AS sedes
+                            FROM sedes_por_region_aux AS s
+                            GROUP BY s.region_geografica ORDER BY sedes DESC """
+fig, ax = plt.subplots(figsize=(10,8))
 
+ax.bar(x=sedes_por_region['region_geografica'],height=sedes_por_region['sedes'],label='sedes')
+ax.legend() #genera la legenda usando la label
+ax.set_xlabel('Region geografica',fontsize=12)
+ax.set_ylabel('Cantidad de sedes',fontsize=12)
+ax.set_xticklabels(sedes_por_region['region_geografica'],rotation=60) 
+ax.set_title('Cantidad de sedes por región geográfica',fontsize=19)
+ax.legend()
+fig.tight_layout() #ajusta el tamaño del figure para que las etiquetas entren bien
 
-
-
-
-
-
+#%%Grafico cantidad de sedes por region geografica
 
 
 
