@@ -46,15 +46,29 @@ datos_migraciones.rename(columns={'Country Origin Code': 'origen',
 
 datos_migraciones=sql^ """SELECT DISTINCT origen, destino, casos_1960,casos_1970,casos_1980,casos_1990,casos_2000 
                           FROM datos_migraciones WHERE genero='TOT'"""
-#%% Tratamiento de nulls
-#rellenamos los valores None del campo redes_sociales por el separador
-datos_completos=datos_completos.fillna(value="//")
-#Completamos los nulls de las sedes sin secciones
-datos_basicos=datos_basicos.fillna(value="0")
-#buscamos los .. que vamos a remplazar
+#%% Calidad de datos
+#Goal: Tener valores numericos en las colummas casos para poder trabajar con esos datos
+#Question: ¿Cuántos '..' en relacion a valores numericos tenemos en la tabla?
+#cantidad de nulls
 null_migraciones=datos_migraciones[(datos_migraciones['casos_1960']=='..') | (datos_migraciones['casos_1970']=='..')
                                    |(datos_migraciones['casos_1980']=='..') | (datos_migraciones['casos_1990']=='..')
                                    |(datos_migraciones['casos_2000']=='..')]
+metrica_migraciones=null_migraciones.shape[0]/datos_migraciones.shape[0]
+#la relacion es muy chica lo que es muy buen signo
+
+
+#Goal Tener todos los datos de las url sin valores nulls, ya que son importantes para nuestro trabajo
+#Question: ¿Cuántos nulls en relacion a todas las url en la tabla?
+null_redes_sociales=(sql^ """Select redes_sociales FROM datos_completos WHERE redes_sociales IS NULL""").shape[0]
+metrica_redes_sociales=null_redes_sociales/datos_completos.shape[0]
+#tenemos casi un 25 porciento de valores null en redes sociales
+#Goal Tener todos los datos de las cantidad de secciones
+#Question: ¿Cuántos datos nulls tenemos en seccion en relacion los datos totaltes tenemos en la tabla?
+null_secciones=(sql^ """Select seccion FROM datos_basicos WHERE seccion IS NULL""").shape[0]
+metrica_secciones=null_secciones/datos_basicos.shape[0]
+#vemos una proporcion de 0,37 aproximadamente
+
+#%% tratamiento de nulls
 #Remplazamos los nulls expresados como .. por 0
 for index,rows in null_migraciones.iterrows():
     if datos_migraciones.loc[index,'casos_1960']=='..':
@@ -70,8 +84,27 @@ for index,rows in null_migraciones.iterrows():
         datos_migraciones.loc[index,'casos_1990']=0
     
     if datos_migraciones.loc[index,'casos_2000']=='..':
-        datos_migraciones.loc[index,'casos_2000']=0    
+        datos_migraciones.loc[index,'casos_2000']=0 
+        
+#rellenamos los valores None del campo redes_sociales por el separador
+datos_completos=datos_completos.fillna(value="//")
 
+#Completamos los nulls de las sedes sin secciones con 0
+datos_basicos=datos_basicos.fillna(value="0")
+        
+#volvemos a revisar las metricas
+null_migraciones=datos_migraciones[(datos_migraciones['casos_1960']=='..') | (datos_migraciones['casos_1970']=='..')
+                                   |(datos_migraciones['casos_1980']=='..') | (datos_migraciones['casos_1990']=='..')
+                                   |(datos_migraciones['casos_2000']=='..')]
+metrica_migraciones=null_migraciones.shape[0]/datos_migraciones.shape[0]
+
+null_redes_sociales=(sql^ """Select redes_sociales FROM datos_completos WHERE redes_sociales IS NULL""").shape[0]
+metrica_redes_sociales=null_redes_sociales/datos_completos.shape[0]
+#tenemos un 0 porciento de valores null en redes sociales
+
+null_secciones=(sql^ """Select seccion FROM datos_basicos WHERE seccion IS NULL""").shape[0]
+metrica_secciones=null_secciones/datos_basicos.shape[0]
+# tenemos 0 nulls luego del tratamiento
 #%% Separando la lista anidada
 
 indexes=[] #futuras columnas del df
