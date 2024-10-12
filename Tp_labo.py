@@ -10,6 +10,7 @@
 import pandas as pd
 from inline_sql import sql,sql_val
 import matplotlib.pyplot as plt
+import numpy as np
 #datos sedes
 datos_basicos=pd.read_csv(".\\lista-sedes.csv")
 datos_completos=pd.read_csv(".\\Datos_sedes_completos.csv")
@@ -284,7 +285,90 @@ ax.set_title('Cantidad de sedes por región geográfica',fontsize=19)
 ax.legend()
 fig.tight_layout() #ajusta el tamaño del figure para que las etiquetas entren bien
 
-#%%Grafico cantidad de sedes por region geografica
+#%%Grafico cantidad de flujo migratorio promedio por region
+#OBJETIVO sumar todas las emigraciones independientemente del año en cada pais con almenos una sede argentina
+#Hacemos una tabla con origenes y destinos con sedes argentinas
+paises_objetivo=sql^ """SELECT DISTINCT origen,destino FROM datos_migraciones
+                        INNER JOIN paises_con_sedes_argentinas ON origen=pais_iso_3 
+                        WHERE destino IN (SELECT DISTINCT pais_iso_3 FROM paises_con_sedes_argentinas)"""
+
+flujo_emigratorio=sql^ """SELECT DISTINCT p.origen , 
+                          SUM(CAST(m.casos_1960 AS INTEGER)+
+                           CAST(m.casos_1970 AS INTEGER)+
+                           CAST(m.casos_1980 AS INTEGER)+
+                           CAST(m.casos_1990 AS INTEGER)+
+                           CAST(m.casos_2000 AS INTEGER)) AS flujo_emi
+                          FROM paises_objetivo AS p 
+                          INNER JOIN datos_migraciones AS m
+                          ON p.origen= m.origen AND p.destino=m.destino 
+                          GROUP BY p.origen 
+                         """
+#OBJETIVO sumar todas las inmigraciones independientemente del año en cada pais con almenos una sede argentina
+
+flujo_inmigratorio=sql^ """SELECT DISTINCT p.destino , 
+                          SUM(CAST(m.casos_1960 AS INTEGER)+
+                           CAST(m.casos_1970 AS INTEGER)+
+                           CAST(m.casos_1980 AS INTEGER)+
+                           CAST(m.casos_1990 AS INTEGER)+
+                           CAST(m.casos_2000 AS INTEGER)) AS flujo_inmi
+                          FROM paises_objetivo AS p 
+                          INNER JOIN datos_migraciones AS m
+                          ON p.origen= m.origen AND p.destino=m.destino 
+                          GROUP BY p.destino 
+                        """
+#OBJETIVO sacar promedio y agrupar por regiones 
+
+flujo_migratorio_paises=sql^""" SELECT fe.origen, (flujo_emi-flujo_inmi)/5 AS flujo_migratorio 
+                                FROM flujo_emigratorio AS fe
+                                INNER JOIN flujo_inmigratorio AS fi ON fe.origen=fi.destino"""
+
+
+flujo_promedio_por_regiones=sql^"""SELECT DISTINCT u.region_geografica, flujo_migratorio
+                                FROM ubicacion AS u INNER JOIN flujo_migratorio_paises AS f
+                                ON u.pais_iso_3=f.origen
+                                """
+
+#Datos utiles para clasificar las regiones y armar los boxplots
+regiones_objetivo=sql^"""SELECT DISTINCT region_geografica FROM flujo_promedio_por_regiones """
+
+
+cantidad_regiones=regiones_objetivo.shape[0]
+
+fig, ax =plt.subplots(figsize=(18,6))
+fig.tight_layout()
+valores_por_regiones=[]
+#obtenemos todos los datos_separados por regiones
+for index, row in regiones_objetivo.iterrows():
+    region=regiones_objetivo.loc[index,'region_geografica']
+    df_boxplot=sql^ """SELECT flujo_migratorio FROM flujo_promedio_por_regiones WHERE region_geografica=$region"""        
+    #lo pasamos a lista porque no sorporta dataframes matplotlib
+    lista_boxplot=[]
+    for index_df,row_df in df_boxplot.iterrows():
+        lista_boxplot.append(df_boxplot.loc[index_df,'flujo_migratorio'])
+    valores_por_regiones.append(lista_boxplot)
+
+#pasamos a lista por que matplotlib no maneja bien los df
+regiones_objetivo=[row['region_geografica'] for _, row in regiones_objetivo.iterrows()]
+
+#los ordenamos segun la mediana
+valores_por_regiones=sorted(valores_por_regiones, key=lambda valor: np.median(valor))
+
+#los_graficamos en orden
+ax.boxplot(valores_por_regiones)
+
+ax.set_xticks([1,2,3,4,5,6,7,8,9])
+ax.set_xticklabels(regiones_objetivo)
+
+
+
+
+
+
+
+
+
+
+
 
 
 
