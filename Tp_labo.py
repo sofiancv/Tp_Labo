@@ -51,24 +51,25 @@ datos_migraciones=sql^ """SELECT DISTINCT origen, destino, casos_1960,casos_1970
 #%% Calidad de datos
 #Goal: Tener valores numericos en las colummas casos para poder trabajar con esos datos
 #Question: ¿Cuántos '..' en relacion a valores numericos tenemos en la tabla?
+
 #cantidad de nulls
 null_migraciones=datos_migraciones[(datos_migraciones['casos_1960']=='..') | (datos_migraciones['casos_1970']=='..')
                                    |(datos_migraciones['casos_1980']=='..') | (datos_migraciones['casos_1990']=='..')
                                    |(datos_migraciones['casos_2000']=='..')]
-metrica_migraciones=null_migraciones.shape[0]/datos_migraciones.shape[0]
-#la relacion es muy chica lo que es muy buen signo
+metrica_migraciones=null_migraciones.shape[0]/datos_migraciones.shape[0]*100
+#la relacion es muy chica, alrededor de 4%, lo que es muy buen signo
 
 
 #Goal Tener todos los datos de las url sin valores nulls, ya que son importantes para nuestro trabajo
 #Question: ¿Cuántos nulls en relacion a todas las url en la tabla?
 null_redes_sociales=(sql^ """Select redes_sociales FROM datos_completos WHERE redes_sociales IS NULL""").shape[0]
-metrica_redes_sociales=null_redes_sociales/datos_completos.shape[0]
-#tenemos casi un 25 porciento de valores null en redes sociales
+metrica_redes_sociales=null_redes_sociales/datos_completos.shape[0]*100
+#tenemos casi un 25% de valores null en redes sociales
 #Goal Tener todos los datos de las cantidad de secciones
 #Question: ¿Cuántos datos nulls tenemos en seccion en relacion los datos totaltes tenemos en la tabla?
 null_secciones=(sql^ """Select seccion FROM datos_basicos WHERE seccion IS NULL""").shape[0]
-metrica_secciones=null_secciones/datos_basicos.shape[0]
-#vemos una proporcion de 0,37 aproximadamente
+metrica_secciones=null_secciones/datos_basicos.shape[0]*100
+#vemos un  37% aproximadamente
 
 #%% tratamiento de nulls
 #Remplazamos los nulls expresados como .. por 0
@@ -102,7 +103,7 @@ metrica_migraciones=null_migraciones.shape[0]/datos_migraciones.shape[0]
 
 null_redes_sociales=(sql^ """Select redes_sociales FROM datos_completos WHERE redes_sociales IS NULL""").shape[0]
 metrica_redes_sociales=null_redes_sociales/datos_completos.shape[0]
-#tenemos un 0 porciento de valores null en redes sociales
+#tenemos un 0% de valores null en redes sociales
 
 null_secciones=(sql^ """Select seccion FROM datos_basicos WHERE seccion IS NULL""").shape[0]
 metrica_secciones=null_secciones/datos_basicos.shape[0]
@@ -149,7 +150,7 @@ for index,row in datos_completos.iterrows():
                    red+=lista[posicion_actual]
        posicion_actual+=1
 #armado del dataframe       
-dict_sede_red_social : dict={'sede_id': indexes ,'redes' : redes} 
+dict_sede_red_social : dict={'sede_id': indexes ,'url' : redes} 
 
 red_social=pd.DataFrame(dict_sede_red_social)
     
@@ -226,15 +227,15 @@ dataframe_resultado=sql^ """SELECT DISTINCT fepg.region_geografica AS 'region ge
                             
 #%% Ejercicio Consultas SQL iii
 # no son todas pero hay un buen cubrimiento
-redes_por_sedes=sql^"""SELECT DISTINCT sede_id, CASE WHEN redes LIKE '%facebook%' THEN 'facebook' ELSE
-                       CASE WHEN redes LIKE '%instagram%' THEN 'instragram' ELSE 
-                       CASE WHEN redes LIKE '%twitter%' THEN 'twitter' ELSE
-                       CASE WHEN redes LIKE '%youtube%' THEN 'youtube'  END END END END AS red FROM red_social """ 
+redes_por_sedes=sql^"""SELECT DISTINCT sede_id, CASE WHEN url LIKE '%facebook%' THEN 'facebook' ELSE
+                       CASE WHEN url LIKE '%instagram%' THEN 'instragram' ELSE 
+                       CASE WHEN url LIKE '%twitter%' THEN 'twitter' ELSE
+                       CASE WHEN url LIKE '%youtube%' THEN 'youtube'  END END END END AS red FROM red_social """ 
 
 #unimos las sedes con sus respectivos paises
 sedes_paises=sql^"""SELECT DISTINCT cp.pais, rps.sede_id FROM redes_por_sedes AS rps
-               INNER JOIN sedes AS s ON rps.sede_id=s.sede_id  
-               INNER JOIN codigos_paises AS cp ON s.pais_iso_3=cp.pais_iso_3"""
+                INNER JOIN sedes AS s ON rps.sede_id=s.sede_id  
+                INNER JOIN codigos_paises AS cp ON s.pais_iso_3=cp.pais_iso_3"""
 #Hay nulls porque no identificamos todas las redes sociales
 dataframe_resultado=sql^"""SELECT DISTINCT sp.pais, COUNT(DISTINCT rps.red) AS 'redes distintas' 
                            FROM redes_por_sedes AS rps
@@ -244,12 +245,12 @@ dataframe_resultado=sql^"""SELECT DISTINCT sp.pais, COUNT(DISTINCT rps.red) AS '
 
 #%% Ejercicio Consultass SQL iv
 #similar al punto anterior pero añadimos las url
-redes_por_sedes=sql^"""SELECT DISTINCT sede_id, CASE WHEN redes LIKE '%facebook%' THEN 'facebook' ELSE
-                       CASE WHEN redes LIKE '%instagram%' THEN 'instragram' ELSE 
-                       CASE WHEN redes LIKE '%twitter%' THEN 'twitter' ELSE
-                       CASE WHEN redes LIKE '%youtube%' THEN 'youtube'  END END END END AS red, 
-                       redes AS url
-                       FROM red_social """ 
+redes_por_sedes=sql^"""SELECT DISTINCT sede_id, CASE WHEN url LIKE '%facebook%' THEN 'facebook' ELSE
+                       CASE WHEN url LIKE '%instagram%' THEN 'instragram' ELSE 
+                       CASE WHEN url LIKE '%twitter%' THEN 'twitter' ELSE
+                       CASE WHEN url LIKE '%youtube%' THEN 'youtube'  END END END END AS red,url
+                       FROM red_social """
+                       
 #reutilizamos la tabla sedes_paises del ejercicio anterior           
 dataframe_resultado=sql^"""SELECT DISTINCT sp.pais, rps.sede_id, rps.red, rps.url 
                            FROM redes_por_sedes AS rps 
@@ -275,7 +276,6 @@ sedes_por_region=sql^ """SELECT DISTINCT s.region_geografica, SUM(s.cantidad_de_
                             FROM sedes_por_region_aux AS s
                             GROUP BY s.region_geografica ORDER BY sedes DESC """
 fig, ax = plt.subplots(figsize=(10,8))
-
 ax.bar(x=sedes_por_region['region_geografica'],height=sedes_por_region['sedes'],label='sedes')
 ax.legend() #genera la legenda usando la label
 ax.set_xlabel('Region geografica',fontsize=12)
@@ -374,14 +374,15 @@ for i in range (len(valores_regiones_ordenados)):
 #los_graficamos en orden
 fig, ax =plt.subplots(figsize=(18,6))
 ax.boxplot(datos_region_ordenados,label='mediana')
-ax.scatter(x=region_ordenada, y=[np.mean(x) for x in datos_region_ordenados], label='media', color='green')
+ax.scatter(x=[1,2,3,4,5,6,7,8,9], y=[np.mean(x) for x in datos_region_ordenados], label='media', color='green')
 ax.set_xticks([1,2,3,4,5,6,7,8,9])
 ax.set_xticklabels(region_ordenada)
 plt.xticks(rotation=30)
-#plt.ylim(-0.5e7,10)
 plt.tight_layout()
 ax.legend()
 
+#%% graficos flujos migratorios hacia argentina en el año 2000 y cantidad de sedes
+##############
 
 
 
