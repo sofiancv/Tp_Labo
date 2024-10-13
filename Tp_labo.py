@@ -145,7 +145,6 @@ for index,row in datos_completos.iterrows():
            else:
                if lista[posicion_actual]==" ":
                    red+="%20" #las url no soportan espacios, asi que se codifican
-               
                else:
                    red+=lista[posicion_actual]
        posicion_actual+=1
@@ -176,10 +175,6 @@ sedes_por_paises=sql^"""SELECT DISTINCT cp.pais, COUNT(s.sede_id) AS sedes,
                             INNER JOIN codigos_paises AS cp ON s.pais_iso_3=cp.pais_iso_3
                             GROUP BY cp.pais
                             """ 
-
-
-
-
 #calculamos el flujo de emigrantes de cada pais
 flujo_emigrantes=sql^"""SELECT cp.pais, sum(CAST(casos_2000 AS INTEGER)) AS emigrantes FROM paises AS p
                         INNER JOIN codigos_paises cp ON cp.pais_iso_3= p.origen
@@ -194,7 +189,7 @@ flujo_inmigrantes=sql^"""SELECT cp.pais, sum(CAST(casos_2000 AS INTEGER)) AS inm
 flujo_migratorio_neto=sql^"""SELECT DISTINCT fe.pais,fe.emigrantes-fi.inmigrantes AS neto FROM flujo_emigrantes AS fe
                             INNER JOIN flujo_inmigrantes AS fi ON fe.pais=fi.pais """
 #Unimos todo en el resultado                            
-dataframe_resultado=sql^ """SELECT DISTINCT spp.pais,spp.sedes,spp.secciones/spp.sedes AS 'Secciones promedio',
+dataframe_resultado_i=sql^ """SELECT DISTINCT spp.pais,spp.sedes,spp.secciones/spp.sedes AS 'Secciones promedio',
                             fmn.neto AS  'Flujo Migratorio Neto' FROM sedes_por_paises AS spp
                             INNER JOIN flujo_migratorio_neto AS fmn ON spp.pais=fmn.pais
                             ORDER BY spp.sedes DESC, spp.pais ASC"""
@@ -207,18 +202,18 @@ regiones=sql^ """SELECT DISTINCT u.region_geografica, count(p.pais_iso_3) AS pai
                             INNER JOIN ubicacion AS u ON u.pais_iso_3=p.pais_iso_3
                             GROUP BY region_geografica
                             """
-
+#calculamos la cantidad de emigrantes argentino
 flujo_emigrantes_por_pais=sql^"""SELECT p.pais_iso_3, SUM(CAST(paises.casos_2000 AS INTEGER)) AS flujo FROM paises_con_sedes_argentinas AS p
                                    INNER JOIN paises ON p.pais_iso_3=paises.destino WHERE paises.origen='ARG' AND p.pais_iso_3!='ARG'
                                    GROUP BY p.pais_iso_3
                                 """
-                                
+#agrupamos la cantidad de migrantes previamente calculada por region
 flujo_emigrantes_por_regiones=sql^ """SELECT DISTINCT u.region_geografica, SUM(fepp.flujo) AS flujo_regional
                                       FROM flujo_emigrantes_por_pais AS fepp
                                       INNER JOIN ubicacion AS u ON fepp.pais_iso_3=u.pais_iso_3
                                       GROUP BY u.region_geografica"""
-                                      
-dataframe_resultado=sql^ """SELECT DISTINCT fepg.region_geografica AS 'region geografica', 
+#unimos los datos previamente calculado, les ponemos el nombre y ordenamos como en la consigna
+dataframe_resultado_ii=sql^ """SELECT DISTINCT fepg.region_geografica AS 'region geografica', 
                             r.paises AS 'Paises Con Sedes Argentinas',
                             fepg.flujo_regional/r.paises AS 'Promedio flujo con Argentina - Países con Sedes Argentinas'
                             FROM flujo_emigrantes_por_regiones AS fepg INNER JOIN regiones AS r 
@@ -237,7 +232,8 @@ sedes_paises=sql^"""SELECT DISTINCT cp.pais, rps.sede_id FROM redes_por_sedes AS
                 INNER JOIN sedes AS s ON rps.sede_id=s.sede_id  
                 INNER JOIN codigos_paises AS cp ON s.pais_iso_3=cp.pais_iso_3"""
 #Hay nulls porque no identificamos todas las redes sociales
-dataframe_resultado=sql^"""SELECT DISTINCT sp.pais, COUNT(DISTINCT rps.red) AS 'redes distintas' 
+#unimos los datos previamente calculado, les ponemos el nombre y ordenamos como en la consigna
+dataframe_resultado_iii=sql^"""SELECT DISTINCT sp.pais, COUNT(DISTINCT rps.red) AS 'redes distintas' 
                            FROM redes_por_sedes AS rps
                            INNER JOIN sedes_paises AS sp ON rps.sede_id=sp.sede_id 
                            WHERE rps.red IS NOT NULL
@@ -252,13 +248,12 @@ redes_por_sedes=sql^"""SELECT DISTINCT sede_id, CASE WHEN url LIKE '%facebook%' 
                        FROM red_social """
                        
 #reutilizamos la tabla sedes_paises del ejercicio anterior           
-dataframe_resultado=sql^"""SELECT DISTINCT sp.pais, rps.sede_id, rps.red, rps.url 
+
+dataframe_resultado_iv=sql^"""SELECT DISTINCT sp.pais, rps.sede_id, rps.red, rps.url 
                            FROM redes_por_sedes AS rps 
                            INNER JOIN sedes_paises AS sp ON rps.sede_id=sp.sede_id
                            WHERE rps.red IS NOT NULL 
                            ORDER BY sp.pais ASC, rps.sede_id ASC, rps.red ASC, rps.url ASC """
-
-
 #%%Grafico cantidad de sedes por region geografica
 #buscamos la cantidad de sedes por regiones
 sedes_por_codigo_pais=sql^ """SELECT DISTINCT pais_iso_3, COUNT(sede_id) AS cantidad_de_sedes
@@ -286,12 +281,11 @@ ax.legend()
 fig.tight_layout() #ajusta el tamaño del figure para que las etiquetas entren bien
 
 #%%Grafico cantidad de flujo migratorio promedio por region
-#OBJETIVO sumar todas las emigraciones independientemente del año en cada pais con almenos una sede argentina
 #Hacemos una tabla con origenes y destinos con sedes argentinas
 paises_objetivo=sql^ """SELECT DISTINCT origen,destino FROM datos_migraciones
                         INNER JOIN paises_con_sedes_argentinas ON origen=pais_iso_3 
                         WHERE destino IN (SELECT DISTINCT pais_iso_3 FROM paises_con_sedes_argentinas)"""
-
+#Necesitamos sumar todas las emigraciones independientemente del año en cada pais con almenos una sede argentina
 flujo_emigratorio=sql^ """SELECT DISTINCT p.origen , 
                           SUM(CAST(m.casos_1960 AS INTEGER)+
                            CAST(m.casos_1970 AS INTEGER)+
@@ -303,8 +297,7 @@ flujo_emigratorio=sql^ """SELECT DISTINCT p.origen ,
                           ON p.origen= m.origen AND p.destino=m.destino 
                           GROUP BY p.origen 
                          """
-#OBJETIVO sumar todas las inmigraciones independientemente del año en cada pais con almenos una sede argentina
-
+#realizamos lo mismo con las inmigraciones
 flujo_inmigratorio=sql^ """SELECT DISTINCT p.destino , 
                           SUM(CAST(m.casos_1960 AS INTEGER)+
                            CAST(m.casos_1970 AS INTEGER)+
@@ -316,19 +309,18 @@ flujo_inmigratorio=sql^ """SELECT DISTINCT p.destino ,
                           ON p.origen= m.origen AND p.destino=m.destino 
                           GROUP BY p.destino 
                         """
-#OBJETIVO sacar promedio y agrupar por regiones 
-
+#Calculamos el promedio
 flujo_migratorio_paises=sql^""" SELECT fe.origen, (flujo_emi-flujo_inmi)/5 AS flujo_migratorio 
                                 FROM flujo_emigratorio AS fe
                                 INNER JOIN flujo_inmigratorio AS fi ON fe.origen=fi.destino"""
 
-
+#lo agrupamos por regiones
 flujo_promedio_por_regiones=sql^"""SELECT DISTINCT u.region_geografica, flujo_migratorio
                                 FROM ubicacion AS u INNER JOIN flujo_migratorio_paises AS f
                                 ON u.pais_iso_3=f.origen
                                 """
 
-#Datos utiles para clasificar las regiones y armar los boxplots
+#Van  a ser la regiones sobre las que vamos a hacer los boxplot
 regiones_objetivo=sql^"""SELECT DISTINCT region_geografica FROM flujo_promedio_por_regiones """
 
 
@@ -345,10 +337,9 @@ for index, row in regiones_objetivo.iterrows():
     for index_df,row_df in df_boxplot.iterrows():
         lista_boxplot.append(df_boxplot.loc[index_df,'flujo_migratorio'])
     valores_por_regiones.append((region,lista_boxplot))
+    #decidimos estructurar los datos en tuplas ya que necesitamos que al ordenar ambos se ordenen segun la mediana 
 
-
-
-#los ordenamos segun la mediana
+#los ordenamos segun la mediana (de forma decreciente)
 valores_regiones_ordenados=[]
 valores_ordendados=[]
 inf=10e12
@@ -356,15 +347,15 @@ maximo=-inf
 for i in range(len(valores_por_regiones)):
     for j in range(len(valores_por_regiones)):
         candidato=np.median(valores_por_regiones[j][1])
-        if  j not in valores_ordendados and candidato>=maximo :
+        if  j not in valores_ordendados and candidato>=maximo : # buscamos el valor maximo de mediana
             maximo=candidato
             maximo_index=j
-    valores_regiones_ordenados.append(valores_por_regiones[maximo_index])
-    valores_ordendados.append(maximo_index)
+    valores_regiones_ordenados.append(valores_por_regiones[maximo_index]) # los valores ordenados
+    valores_ordendados.append(maximo_index) #guardamos las medianas que ya fueron ordenadas 
     maximo=-inf
 
 #separamos en una lista de regiones y otra de valores para los datos ya ordenados
-region_ordenada=[]
+region_ordenada=[] 
 datos_region_ordenados=[]
 for i in range (len(valores_regiones_ordenados)):
     region_ordenada.append(valores_regiones_ordenados[i][0])
@@ -376,13 +367,12 @@ fig, ax =plt.subplots(figsize=(18,6))
 ax.boxplot(datos_region_ordenados,label='mediana')
 ax.scatter(x=[1,2,3,4,5,6,7,8,9], y=[np.mean(x) for x in datos_region_ordenados], label='media', color='green')
 ax.set_xticks([1,2,3,4,5,6,7,8,9])
-ax.set_xticklabels(region_ordenada)
+ax.set_xticklabels(region_ordenada) 
 plt.xticks(rotation=30)
 plt.tight_layout()
 ax.legend()
 
 #%% graficos flujos migratorios hacia argentina en el año 2000 y cantidad de sedes
-##############
 
 
 
