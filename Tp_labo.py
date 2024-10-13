@@ -334,33 +334,53 @@ regiones_objetivo=sql^"""SELECT DISTINCT region_geografica FROM flujo_promedio_p
 
 cantidad_regiones=regiones_objetivo.shape[0]
 
-fig, ax =plt.subplots(figsize=(18,6))
-fig.tight_layout()
+
 valores_por_regiones=[]
 #obtenemos todos los datos_separados por regiones
 for index, row in regiones_objetivo.iterrows():
     region=regiones_objetivo.loc[index,'region_geografica']
     df_boxplot=sql^ """SELECT flujo_migratorio FROM flujo_promedio_por_regiones WHERE region_geografica=$region"""        
-    #lo pasamos a lista porque no sorporta dataframes matplotlib
+    #pasamos a lista por que matplotlib no maneja bien los df para hacer los labels
     lista_boxplot=[]
     for index_df,row_df in df_boxplot.iterrows():
         lista_boxplot.append(df_boxplot.loc[index_df,'flujo_migratorio'])
-    valores_por_regiones.append(lista_boxplot)
+    valores_por_regiones.append((region,lista_boxplot))
 
-#pasamos a lista por que matplotlib no maneja bien los df
-regiones_objetivo=[row['region_geografica'] for _, row in regiones_objetivo.iterrows()]
+
 
 #los ordenamos segun la mediana
-valores_por_regiones=sorted(valores_por_regiones, key=lambda valor: np.median(valor))
+valores_regiones_ordenados=[]
+valores_ordendados=[]
+inf=10e12
+maximo=-inf
+for i in range(len(valores_por_regiones)):
+    for j in range(len(valores_por_regiones)):
+        candidato=np.median(valores_por_regiones[j][1])
+        if  j not in valores_ordendados and candidato>=maximo :
+            maximo=candidato
+            maximo_index=j
+    valores_regiones_ordenados.append(valores_por_regiones[maximo_index])
+    valores_ordendados.append(maximo_index)
+    maximo=-inf
+
+#separamos en una lista de regiones y otra de valores para los datos ya ordenados
+region_ordenada=[]
+datos_region_ordenados=[]
+for i in range (len(valores_regiones_ordenados)):
+    region_ordenada.append(valores_regiones_ordenados[i][0])
+    datos_region_ordenados.append(valores_regiones_ordenados[i][1])
+
 
 #los_graficamos en orden
-ax.boxplot(valores_por_regiones)
-
+fig, ax =plt.subplots(figsize=(18,6))
+ax.boxplot(datos_region_ordenados,label='mediana')
+ax.scatter(x=region_ordenada, y=[np.mean(x) for x in datos_region_ordenados], label='media', color='green')
 ax.set_xticks([1,2,3,4,5,6,7,8,9])
-ax.set_xticklabels(regiones_objetivo)
-
-
-
+ax.set_xticklabels(region_ordenada)
+plt.xticks(rotation=30)
+#plt.ylim(-0.5e7,10)
+plt.tight_layout()
+ax.legend()
 
 
 
