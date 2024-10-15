@@ -218,7 +218,7 @@ dataframe_resultado_ii=sql^ """SELECT DISTINCT fepg.region_geografica AS 'region
                             fepg.flujo_regional/r.paises AS 'Promedio flujo con Argentina - Países con Sedes Argentinas'
                             FROM flujo_emigrantes_por_regiones AS fepg INNER JOIN regiones AS r 
                             ON r.region_geografica=fepg.region_geografica
-                            ORDER BY 'Promedio flujo con Argentina - Países con Sedes Argentinas' DESC""" 
+                            ORDER BY "Promedio flujo con Argentina - Países con Sedes Argentinas" DESC""" 
                             
 #%% Ejercicio Consultas SQL iii
 # no son todas pero hay un buen cubrimiento
