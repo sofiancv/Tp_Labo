@@ -22,15 +22,15 @@ datos_migraciones=pd.read_csv(".\\datos_migraciones.csv")
 
 #%% Filtrado
 
-datos_basicos=sql^ """SELECT DISTINCT sede_id, pais_iso_3, pais_castellano,sede_tipo 
+datos_basicos=sql^ """SELECT DISTINCT sede_id, pais_iso_3, pais_castellano
                       FROM datos_basicos """
 
 datos_completos=sql^ """SELECT DISTINCT sede_id, region_geografica , redes_sociales FROM datos_completos"""
 
-datos_secciones=sql^ """SELECT DISTINCT sede_id,COUNT(tipo_seccion) as seccion FROM datos_secciones GROUP BY sede_id"""
+datos_secciones=sql^ """SELECT DISTINCT sede_id,COUNT(*) as cantidad_secciones FROM datos_secciones GROUP BY sede_id"""
 
 datos_basicos=sql^ """SELECT s.sede_id, s.pais_iso_3, 
-                      s.pais_castellano,s.sede_tipo, sec.seccion 
+                      s.pais_castellano, sec.cantidad_secciones
                       FROM datos_basicos AS s LEFT OUTER JOIN datos_secciones AS sec ON s.sede_id=sec.sede_id"""
 
 #renombramos porque tienen espacios los nombres
@@ -67,7 +67,7 @@ metrica_redes_sociales=null_redes_sociales/datos_completos.shape[0]*100
 #tenemos casi un 25% de valores null en redes sociales
 #Goal Tener todos los datos de las cantidad de secciones
 #Question: ¿Cuántos datos nulls tenemos en seccion en relacion los datos totaltes tenemos en la tabla?
-null_secciones=(sql^ """Select seccion FROM datos_basicos WHERE seccion IS NULL""").shape[0]
+null_secciones=(sql^ """Select cantidad_secciones FROM datos_basicos WHERE cantidad_secciones  IS NULL""").shape[0]
 metrica_secciones=null_secciones/datos_basicos.shape[0]*100
 #vemos un  37% aproximadamente
 
@@ -105,7 +105,7 @@ null_redes_sociales=(sql^ """Select redes_sociales FROM datos_completos WHERE re
 metrica_redes_sociales=null_redes_sociales/datos_completos.shape[0]
 #tenemos un 0% de valores null en redes sociales
 
-null_secciones=(sql^ """Select seccion FROM datos_basicos WHERE seccion IS NULL""").shape[0]
+null_secciones=(sql^ """Select cantidad_secciones FROM datos_basicos WHERE cantidad_secciones  IS NULL""").shape[0]
 metrica_secciones=null_secciones/datos_basicos.shape[0]
 # tenemos 0 nulls luego del tratamiento
 #%% Separando la lista anidada
@@ -156,40 +156,40 @@ red_social=pd.DataFrame(dict_sede_red_social)
 #%% Contruimos base de datos segun el der
 
 #red_social lo armamos en la celda anterior
-paises= datos_migraciones
+flujos_migratorios= datos_migraciones
 sedes=sql^ """SELECT DISTINCT db.sede_id, db.pais_iso_3 ,db.pais_castellano AS pais, 
-            dc.region_geografica, db.sede_tipo,db.seccion 
+            dc.region_geografica,db.cantidad_secciones 
             FROM datos_basicos AS db INNER JOIN datos_completos AS dc ON db.sede_id=dc.sede_id"""
 
 #%% Lo llevamos todo a 3FN
 codigos_paises=sql^"""SELECT DISTINCT pais_iso_3, pais FROM sedes"""
 ubicacion=sql^"""SELECT DISTINCT pais_iso_3, region_geografica FROM sedes"""
-sedes=sql^"""SELECT DISTINCT sede_id, pais_iso_3,sede_tipo,seccion FROM sedes"""
+sedes=sql^"""SELECT DISTINCT sede_id, pais_iso_3,cantidad_secciones FROM sedes"""
 
 
 #%% Ejercicios Consultas SQL i
 #contamos la cantidad de sedes argentinas en cada pais y la suma de sus secciones
 sedes_por_paises=sql^"""SELECT DISTINCT cp.pais, COUNT(s.sede_id) AS sedes,
-                            SUM(CAST(s.seccion AS INTEGER)) as secciones
+                            SUM(CAST(s.cantidad_secciones AS INTEGER)) as secciones
                             FROM sedes AS s
                             INNER JOIN codigos_paises AS cp ON s.pais_iso_3=cp.pais_iso_3
                             GROUP BY cp.pais
                             """ 
 #calculamos el flujo de emigrantes de cada pais
-flujo_emigrantes=sql^"""SELECT cp.pais, sum(CAST(casos_2000 AS INTEGER)) AS emigrantes FROM paises AS p
-                        INNER JOIN codigos_paises cp ON cp.pais_iso_3= p.origen
+flujo_emigrantes=sql^"""SELECT cp.pais, sum(CAST(fm.casos_2000 AS INTEGER)) AS emigrantes FROM flujos_migratorios AS fm
+                        INNER JOIN codigos_paises cp ON cp.pais_iso_3= fm.origen
                         GROUP BY cp.pais 
                         """
 #calculamos el flujo de emigrantes de cada pais                       
-flujo_inmigrantes=sql^"""SELECT cp.pais, sum(CAST(casos_2000 AS INTEGER)) AS inmigrantes FROM paises AS p
-                         INNER JOIN codigos_paises cp ON cp.pais_iso_3= p.destino
+flujo_inmigrantes=sql^"""SELECT cp.pais, sum(CAST(fm.casos_2000 AS INTEGER)) AS inmigrantes FROM flujos_migratorios AS fm
+                         INNER JOIN codigos_paises cp ON cp.pais_iso_3= fm.destino
                          GROUP BY cp.pais
                         """
 #calculamos el flujo migratorio neto                        
 flujo_migratorio_neto=sql^"""SELECT DISTINCT fe.pais,fe.emigrantes-fi.inmigrantes AS neto FROM flujo_emigrantes AS fe
                             INNER JOIN flujo_inmigrantes AS fi ON fe.pais=fi.pais """
 #Unimos todo en el resultado                            
-dataframe_resultado_i=sql^ """SELECT DISTINCT spp.pais,spp.sedes,spp.secciones/spp.sedes AS 'Secciones promedio',
+dataframe_resultado_i=sql^ """SELECT DISTINCT spp.pais,spp.sedes,spp.secciones /spp.sedes AS 'Secciones promedio',
                             fmn.neto AS  'Flujo Migratorio Neto' FROM sedes_por_paises AS spp
                             INNER JOIN flujo_migratorio_neto AS fmn ON spp.pais=fmn.pais
                             ORDER BY spp.sedes DESC, spp.pais ASC"""
@@ -203,8 +203,8 @@ regiones=sql^ """SELECT DISTINCT u.region_geografica, count(p.pais_iso_3) AS pai
                             GROUP BY region_geografica
                             """
 #calculamos la cantidad de emigrantes argentino
-flujo_emigrantes_por_pais=sql^"""SELECT p.pais_iso_3, SUM(CAST(paises.casos_2000 AS INTEGER)) AS flujo FROM paises_con_sedes_argentinas AS p
-                                   INNER JOIN paises ON p.pais_iso_3=paises.destino WHERE paises.origen='ARG' AND p.pais_iso_3!='ARG'
+flujo_emigrantes_por_pais=sql^"""SELECT p.pais_iso_3, SUM(CAST(fm.casos_2000 AS INTEGER)) AS flujo FROM paises_con_sedes_argentinas AS p
+                                   INNER JOIN flujos_migratorios AS fm ON p.pais_iso_3=fm.destino WHERE fm.origen='ARG' AND p.pais_iso_3!='ARG'
                                    GROUP BY p.pais_iso_3
                                 """
 #agrupamos la cantidad de migrantes previamente calculada por region
@@ -282,31 +282,31 @@ fig.tight_layout() #ajusta el tamaño del figure para que las etiquetas entren b
 
 #%%Grafico cantidad de flujo migratorio promedio por region
 #Hacemos una tabla con origenes y destinos con sedes argentinas
-paises_objetivo=sql^ """SELECT DISTINCT origen,destino FROM datos_migraciones
+paises_objetivo=sql^ """SELECT DISTINCT origen,destino FROM flujos_migratorios
                         INNER JOIN paises_con_sedes_argentinas ON origen=pais_iso_3 
                         WHERE destino IN (SELECT DISTINCT pais_iso_3 FROM paises_con_sedes_argentinas)"""
 #Necesitamos sumar todas las emigraciones independientemente del año en cada pais con almenos una sede argentina
 flujo_emigratorio=sql^ """SELECT DISTINCT p.origen , 
-                          SUM(CAST(m.casos_1960 AS INTEGER)+
-                           CAST(m.casos_1970 AS INTEGER)+
-                           CAST(m.casos_1980 AS INTEGER)+
-                           CAST(m.casos_1990 AS INTEGER)+
-                           CAST(m.casos_2000 AS INTEGER)) AS flujo_emi
+                          SUM(CAST(fm.casos_1960 AS INTEGER)+
+                           CAST(fm.casos_1970 AS INTEGER)+
+                           CAST(fm.casos_1980 AS INTEGER)+
+                           CAST(fm.casos_1990 AS INTEGER)+
+                           CAST(fm.casos_2000 AS INTEGER)) AS flujo_emi
                           FROM paises_objetivo AS p 
-                          INNER JOIN datos_migraciones AS m
-                          ON p.origen= m.origen AND p.destino=m.destino 
+                          INNER JOIN flujos_migratorios AS fm
+                          ON p.origen= fm.origen AND p.destino=fm.destino 
                           GROUP BY p.origen 
                          """
 #realizamos lo mismo con las inmigraciones
 flujo_inmigratorio=sql^ """SELECT DISTINCT p.destino , 
-                          SUM(CAST(m.casos_1960 AS INTEGER)+
-                           CAST(m.casos_1970 AS INTEGER)+
-                           CAST(m.casos_1980 AS INTEGER)+
-                           CAST(m.casos_1990 AS INTEGER)+
-                           CAST(m.casos_2000 AS INTEGER)) AS flujo_inmi
+                          SUM(CAST(fm.casos_1960 AS INTEGER)+
+                           CAST(fm.casos_1970 AS INTEGER)+
+                           CAST(fm.casos_1980 AS INTEGER)+
+                           CAST(fm.casos_1990 AS INTEGER)+
+                           CAST(fm.casos_2000 AS INTEGER)) AS flujo_inmi
                           FROM paises_objetivo AS p 
-                          INNER JOIN datos_migraciones AS m
-                          ON p.origen= m.origen AND p.destino=m.destino 
+                          INNER JOIN flujos_migratorios AS fm
+                          ON p.origen= fm.origen AND p.destino=fm.destino 
                           GROUP BY p.destino 
                         """
 #Calculamos el promedio
