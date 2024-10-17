@@ -1,5 +1,3 @@
-^#%% Import y datos crudos
-#!/usr/bin/env python3
 
 # -*- coding: utf-8 -*-
 """Created on Fri Sep 20 14:08:46 2024
@@ -27,7 +25,7 @@ datos_migraciones=pd.read_csv(carpeta+"datos_migraciones.csv")
 
 #%% FILTRADO DE DATOS
 
-datos_basicos=sql^ """SELECT DISTINCT sede_id, pais_iso_3, pais_castellano
+datos_basicos=sql^ """SELECT DISTINCT sede_id, pais_iso_3, UPPER(pais_castellano) as pais_castellano
                       FROM datos_basicos """
 
 datos_completos=sql^ """SELECT DISTINCT sede_id, region_geografica , redes_sociales FROM datos_completos"""
@@ -360,7 +358,7 @@ regiones=sql^ """SELECT DISTINCT u.region_geografica, count(p.pais_iso_3) AS pai
                             INNER JOIN ubicacion AS u ON u.pais_iso_3=p.pais_iso_3
                             GROUP BY region_geografica
                             """
-#calculamos la cantidad de emigrantes argentino
+#calculamos la cantidad de emigrantes argentinos
 flujo_emigrantes_por_pais=sql^"""SELECT p.pais_iso_3, SUM(CAST(fm.casos_2000 AS INTEGER)) AS flujo FROM paises_con_sedes_argentinas AS p
                                    INNER JOIN flujos_migratorios AS fm ON p.pais_iso_3=fm.destino WHERE fm.origen='ARG' AND p.pais_iso_3!='ARG'
                                    GROUP BY p.pais_iso_3
@@ -370,6 +368,7 @@ flujo_emigrantes_por_regiones=sql^ """SELECT DISTINCT u.region_geografica, SUM(f
                                       FROM flujo_emigrantes_por_pais AS fepp
                                       INNER JOIN ubicacion AS u ON fepp.pais_iso_3=u.pais_iso_3
                                       GROUP BY u.region_geografica"""
+                                      
 #unimos los datos previamente calculado, les ponemos el nombre y ordenamos como en la consigna
 dataframe_resultado_ii=sql^ """SELECT DISTINCT fepg.region_geografica AS 'region geografica', 
                             r.paises AS 'Paises Con Sedes Argentinas',
