@@ -4,23 +4,28 @@
 # -*- coding: utf-8 -*-
 """Created on Fri Sep 20 14:08:46 2024
 
-@author: Emiliano Torres, Matilda Bartoli y Sofia Copaga
+ALUMNOS: Emiliano Torres, Matilda Bartoli y Sofia Copaga
+GRUPO : EQUIPO ROCKET
 """
 
 import pandas as pd
 from inline_sql import sql,sql_val
 import matplotlib.pyplot as plt
 import numpy as np
-#datos sedes
-datos_basicos=pd.read_csv(".\\lista-sedes.csv")
-datos_completos=pd.read_csv(".\\Datos_sedes_completos.csv")
-#arreglamos la linea 16 manualmente
-datos_secciones=pd.read_csv(".\\Datos_sedes_secciones.csv")
 
-#datos migraciones
-datos_migraciones=pd.read_csv(".\\datos_migraciones.csv")
+#%% IMPORTACIÓN DE LAS BASES DE DATOS
 
-#%% Filtrado
+#DATOS SEDES
+carpeta = "/Users/Usuario/Downloads/Tp_Labo/"
+datos_basicos=pd.read_csv(carpeta+"lista-sedes.csv")
+datos_completos=pd.read_csv(carpeta+"Datos_sedes_completos.csv")
+#arreglamos la linea 16 manualmente (ya que generaba un error al importar dicha base)
+datos_secciones=pd.read_csv(carpeta+"Datos_sedes_secciones.csv")
+
+#DATOS MIGRACIONES
+datos_migraciones=pd.read_csv(carpeta+"datos_migraciones.csv")
+
+#%% FILTRADO DE DATOS
 
 datos_basicos=sql^ """SELECT DISTINCT sede_id, pais_iso_3, pais_castellano
                       FROM datos_basicos """
@@ -33,7 +38,7 @@ datos_basicos=sql^ """SELECT s.sede_id, s.pais_iso_3,
                       s.pais_castellano, sec.cantidad_secciones
                       FROM datos_basicos AS s LEFT OUTER JOIN datos_secciones AS sec ON s.sede_id=sec.sede_id"""
 
-#renombramos porque tienen espacios los nombres
+#renombramos las columnas de datos_migraciones 
 
 datos_migraciones.rename(columns={'Country Origin Code': 'origen',
                           'Migration by Gender Code': 'genero',
@@ -43,36 +48,44 @@ datos_migraciones.rename(columns={'Country Origin Code': 'origen',
                           '1970 [1970]':'casos_1970',
                           '1980 [1980]':'casos_1980',
                           '1990 [1990]':'casos_1990'},inplace=True)
-                          
-                          
 
 datos_migraciones=sql^ """SELECT DISTINCT origen, destino, casos_1960,casos_1970,casos_1980,casos_1990,casos_2000 
                           FROM datos_migraciones WHERE genero='TOT'"""
-#%% Calidad de datos
-#Goal: Tener valores numericos en las colummas casos para poder trabajar con esos datos
-#Question: ¿Cuántos '..' en relacion a valores numericos tenemos en la tabla?
+#%% CALIDAD DE DATOS
 
-#cantidad de nulls
+#DATOS MIGRACIONES. METODO GQM
+#Goal: que los datos correspondientes a las columnas de casos por año posean datos de tipo numerico. 
+#Question: ¿Cuál es la proporción de filas que tienen los datos correspondientes a las columnas de los casos por años igual al simbolo ".."? 
+#Metric = 4% (aproximadamente)
+
 null_migraciones=datos_migraciones[(datos_migraciones['casos_1960']=='..') | (datos_migraciones['casos_1970']=='..')
                                    |(datos_migraciones['casos_1980']=='..') | (datos_migraciones['casos_1990']=='..')
                                    |(datos_migraciones['casos_2000']=='..')]
 metrica_migraciones=null_migraciones.shape[0]/datos_migraciones.shape[0]*100
-#la relacion es muy chica, alrededor de 4%, lo que es muy buen signo
 
 
-#Goal Tener todos los datos de las url sin valores nulls, ya que son importantes para nuestro trabajo
-#Question: ¿Cuántos nulls en relacion a todas las url en la tabla?
+
+#DATOS COMPLETOS . METODO GQM
+#Goal: que el dato correspondiente a la red social de cada sede esté completo. 
+#Question: ¿Cuál es la proporción de sedes que tienen el dato correspondiente a “redes_sociales” vacío?
+#Metric : 24% (aproximadamente)
+
 null_redes_sociales=(sql^ """Select redes_sociales FROM datos_completos WHERE redes_sociales IS NULL""").shape[0]
 metrica_redes_sociales=null_redes_sociales/datos_completos.shape[0]*100
-#tenemos casi un 25% de valores null en redes sociales
-#Goal Tener todos los datos de las cantidad de secciones
-#Question: ¿Cuántos datos nulls tenemos en seccion en relacion los datos totaltes tenemos en la tabla?
+
+#DATOS BASICOS. METODO GQM
+#Goal: que el dato correspondiente a la cantidad de secciones de cada sede esté completo.
+#Question: ¿Cuál es la proporción de sedes que tienen el dato correspondiente a "cantidad_secciones" vacío?
+#Metric : 37% (aproximadamente)
+
 null_secciones=(sql^ """Select cantidad_secciones FROM datos_basicos WHERE cantidad_secciones  IS NULL""").shape[0]
 metrica_secciones=null_secciones/datos_basicos.shape[0]*100
-#vemos un  37% aproximadamente
 
-#%% tratamiento de nulls
-#Remplazamos los nulls expresados como .. por 0
+
+#%% TRATAMIENTO DE NULLS
+
+#DATOS MIGRACIONES.
+#remplazamos los nulls expresados como .. por 0
 for index,rows in null_migraciones.iterrows():
     if datos_migraciones.loc[index,'casos_1960']=='..':
         datos_migraciones.loc[index,'casos_1960']=0
@@ -89,26 +102,37 @@ for index,rows in null_migraciones.iterrows():
     if datos_migraciones.loc[index,'casos_2000']=='..':
         datos_migraciones.loc[index,'casos_2000']=0 
         
+#DATOS COMPLETOS
 #rellenamos los valores None del campo redes_sociales por el separador
 datos_completos=datos_completos.fillna(value="//")
 
-#Completamos los nulls de las sedes sin secciones con 0
+#DATOS BASICOS
+#completamos los nulls de las sedes sin secciones con 0
 datos_basicos=datos_basicos.fillna(value="0")
         
-#volvemos a revisar las metricas
+#ANALISIS DE METRICAS POST TRATAMIENTO
+
+#DATOS MIGRACIONES
+#Metric: 0%
 null_migraciones=datos_migraciones[(datos_migraciones['casos_1960']=='..') | (datos_migraciones['casos_1970']=='..')
                                    |(datos_migraciones['casos_1980']=='..') | (datos_migraciones['casos_1990']=='..')
                                    |(datos_migraciones['casos_2000']=='..')]
 metrica_migraciones=null_migraciones.shape[0]/datos_migraciones.shape[0]
 
+#DATOS COMPLETOS
+#Metric : 0%
 null_redes_sociales=(sql^ """Select redes_sociales FROM datos_completos WHERE redes_sociales IS NULL""").shape[0]
 metrica_redes_sociales=null_redes_sociales/datos_completos.shape[0]
-#tenemos un 0% de valores null en redes sociales
 
+#DATOS BASICOS
+#Metric: 0%
 null_secciones=(sql^ """Select cantidad_secciones FROM datos_basicos WHERE cantidad_secciones  IS NULL""").shape[0]
 metrica_secciones=null_secciones/datos_basicos.shape[0]
-# tenemos 0 nulls luego del tratamiento
-#%% Separando la lista anidada
+
+
+#%% MEJORA DE CALIDAD DE DATOS
+
+#DATOS COMPLETOS: COLUMNA "redes_sociales". 
 
 indexes=[] #futuras columnas del df
 redes=[]  #futuras columnas del df
@@ -148,12 +172,122 @@ for index,row in datos_completos.iterrows():
                else:
                    red+=lista[posicion_actual]
        posicion_actual+=1
+       
 #armado del dataframe       
 dict_sede_red_social : dict={'sede_id': indexes ,'url' : redes} 
 
 red_social=pd.DataFrame(dict_sede_red_social)
-    
-#%% Contruimos base de datos segun el der
+
+#FILTRADO DE DATOS DEL DATAFRAME red_social
+
+#filtro aquellas filas del dataFrame red_social donde el valor de la columna url no tiene una url "explicita" y
+#tiene como valor uno donde la primera posicion sea el simbolo @.
+
+red_social_2 = sql^ """Select sede_id, url
+            From red_social 
+            Where url Like '@%'
+            """
+            
+#convertimos los @ a url de instagram
+def convertir_a_url_instagram(url):
+    if url in [
+    "@embajada_argentina_en_bolivia",
+     "@embargen", 
+     "@consuladoargentinoensalto", 
+     "@argennicaragua",
+     "@arg_clang",
+     "@consuladoargentinoenroma", 
+     "@argenflorianopolis", 
+     "@argentinaindonesia"] :
+        
+        return f'https://instagram.com/{url[1:]}'
+    else:
+       return url
+
+#aplicamos la función a la columna url
+red_social_2['url'] = red_social_2['url'].apply(convertir_a_url_instagram)
+
+##convertimos los @ a url de facebook
+def convertir_a_url_facebook(url):
+    if url in [
+            "@EmbajadaArgentinaBolivia", 
+            "@Argentinaenturquia/", 
+            "@ArgentinaEnChina", 
+            "@ArgentinaEnHonduras", 
+            "@ArgentinaEnNicaragua", 
+            "@ArgEnRoma", 
+            "@ArgentinaEnPanama"] :
+
+        return f'https://facebook.com/{url[1:]}'
+    else:
+        return url
+
+#aplicamos la función a la columna url
+red_social_2['url'] = red_social_2['url'].apply(convertir_a_url_facebook)
+
+#convertimos los @ a url de twitter
+def convertir_a_url_twitter(url):
+    if url in [
+            "@ArEthiopia",
+            "@ArgColombia",
+            "@ARGenSenegal",
+            "@ARGenTurquia",
+            "@EmbaArgBolivia", 
+            "@ArgenFao", 
+            "@argenmiami", 
+            "@ARGenHouston"] :
+
+        return f'https://twitter.com/{url[1:]}'
+    else:
+        return url
+
+#aplico la función a la columna url
+red_social_2['url'] = red_social_2['url'].apply(convertir_a_url_twitter)
+
+#borramos aquellas filas donde la red social no refleja un dato de la realidad (para mejorar la calidad de nuestros datos)
+indices= [3,14]
+red_social_2 = red_social_2.drop(index= indices)
+
+#filtro aquellas filas del dataFrame red_social donde el valor de la columna url no tiene una url "explicita" y
+#tiene como valor algo que no posea el simbolo @, o "https" o "/".
+red_social_3 = sql^ """
+    SELECT sede_id, url
+    FROM red_social
+    WHERE url NOT LIKE '%@%' 
+      AND url NOT LIKE '%https%' 
+      AND url NOT LIKE '%/%'
+"""
+#convertimos a url los datos que pueden ser convertidos bajo nuestro criterio y analisis
+def convertir_a_url_instagram_2(url):
+    if url in [
+        "argentinaencolombia", 
+        "argentinaenjamaica", 
+        "embajadaargentinaenjapon", 
+        "argenmozambique", 
+        "arg_trinidad_tobago", 
+        "consuladoargentinomia"
+    ]:
+        return f'https://instagram.com/{url}'
+    else:
+        return url
+
+#aplicamos la función a la columna url
+red_social_3['url'] = red_social_3['url'].apply(convertir_a_url_instagram_2)
+#borramos aquellas filas donde la red social no refleja un dato de la realidad (para mejorar la calidad de nuestros datos)
+indices_2 = [1,2,7]
+red_social_3 = red_social_3.drop(index= indices_2)
+
+#borramos aquellas filas del dataFrame red_social filas que se encuentran en los dataFrames "red_social_2" y "red_social_3"
+red_social = sql^ """SELECT sede_id, url
+         FROM red_social
+       WHERE url NOT LIKE '%@%' 
+      AND url LIKE '%https%' 
+      AND url LIKE '%.com%' """
+
+#concatenamos los  3 dataFrames
+red_social = pd.concat([red_social, red_social_2, red_social_3], ignore_index=True)
+
+#%% CONSTRUCCION DE NUESTRA BASE DE DATOS SEGUN EL DER
 
 #red_social lo armamos en la celda anterior
 flujos_migratorios= datos_migraciones
@@ -161,13 +295,16 @@ sedes=sql^ """SELECT DISTINCT db.sede_id, db.pais_iso_3 ,db.pais_castellano AS p
             dc.region_geografica,db.cantidad_secciones 
             FROM datos_basicos AS db INNER JOIN datos_completos AS dc ON db.sede_id=dc.sede_id"""
 
-#%% Lo llevamos todo a 3FN
+#%% PASAMOS EL MODELO RELACIONAL A 3FN
+
 codigos_paises=sql^"""SELECT DISTINCT pais_iso_3, pais FROM sedes"""
 ubicacion=sql^"""SELECT DISTINCT pais_iso_3, region_geografica FROM sedes"""
 sedes=sql^"""SELECT DISTINCT sede_id, pais_iso_3,cantidad_secciones FROM sedes"""
 
 
-#%% Ejercicios Consultas SQL i
+#%% CONSULTAS
+#%%
+#Consultas SQL i
 #contamos la cantidad de sedes argentinas en cada pais y la suma de sus secciones
 sedes_por_paises=sql^"""SELECT DISTINCT cp.pais, COUNT(s.sede_id) AS sedes,
                             SUM(CAST(s.cantidad_secciones AS INTEGER)) as secciones
@@ -180,7 +317,7 @@ flujo_emigrantes=sql^"""SELECT cp.pais, sum(CAST(fm.casos_2000 AS INTEGER)) AS e
                         INNER JOIN codigos_paises cp ON cp.pais_iso_3= fm.origen
                         GROUP BY cp.pais 
                         """
-#calculamos el flujo de emigrantes de cada pais                       
+#calculamos el flujo de imigrantes de cada pais                       
 flujo_inmigrantes=sql^"""SELECT cp.pais, sum(CAST(fm.casos_2000 AS INTEGER)) AS inmigrantes FROM flujos_migratorios AS fm
                          INNER JOIN codigos_paises cp ON cp.pais_iso_3= fm.destino
                          GROUP BY cp.pais
@@ -188,7 +325,7 @@ flujo_inmigrantes=sql^"""SELECT cp.pais, sum(CAST(fm.casos_2000 AS INTEGER)) AS 
 #calculamos el flujo migratorio neto                        
 flujo_migratorio_neto=sql^"""SELECT DISTINCT fe.pais,fe.emigrantes-fi.inmigrantes AS neto FROM flujo_emigrantes AS fe
                             INNER JOIN flujo_inmigrantes AS fi ON fe.pais=fi.pais """
-#Unimos todo en el resultado                            
+#unimos todo en el resultado                            
 dataframe_resultado_i=sql^ """SELECT DISTINCT spp.pais,spp.sedes,spp.secciones /spp.sedes AS 'Secciones promedio',
                             fmn.neto AS  'Flujo Migratorio Neto' FROM sedes_por_paises AS spp
                             INNER JOIN flujo_migratorio_neto AS fmn ON spp.pais=fmn.pais
@@ -197,6 +334,7 @@ dataframe_resultado_i=sql^ """SELECT DISTINCT spp.pais,spp.sedes,spp.secciones /
 #%% Ejercicio Consultas SQL ii
 
 paises_con_sedes_argentinas=sql^"""SELECT DISTINCT pais_iso_3 FROM sedes"""
+
 #la cantidad de paises con sedes agrupadas por region
 regiones=sql^ """SELECT DISTINCT u.region_geografica, count(p.pais_iso_3) AS paises FROM paises_con_sedes_argentinas AS p
                             INNER JOIN ubicacion AS u ON u.pais_iso_3=p.pais_iso_3
@@ -225,7 +363,8 @@ dataframe_resultado_ii=sql^ """SELECT DISTINCT fepg.region_geografica AS 'region
 redes_por_sedes=sql^"""SELECT DISTINCT sede_id, CASE WHEN url LIKE '%facebook%' THEN 'facebook' ELSE
                        CASE WHEN url LIKE '%instagram%' THEN 'instragram' ELSE 
                        CASE WHEN url LIKE '%twitter%' THEN 'twitter' ELSE
-                       CASE WHEN url LIKE '%youtube%' THEN 'youtube'  END END END END AS red FROM red_social """ 
+                       CASE WHEN url LIKE '%youtube%' THEN 'youtube' ELSE
+                       CASE WHEN url LIKE '%linkedin%' THEN 'linkedin' END END END END END AS red FROM red_social """ 
 
 #unimos las sedes con sus respectivos paises
 sedes_paises=sql^"""SELECT DISTINCT cp.pais, rps.sede_id FROM redes_por_sedes AS rps
@@ -254,7 +393,10 @@ dataframe_resultado_iv=sql^"""SELECT DISTINCT sp.pais, rps.sede_id, rps.red, rps
                            INNER JOIN sedes_paises AS sp ON rps.sede_id=sp.sede_id
                            WHERE rps.red IS NOT NULL 
                            ORDER BY sp.pais ASC, rps.sede_id ASC, rps.red ASC, rps.url ASC """
-#%%Grafico cantidad de sedes por region geografica
+                           
+#%%GRAFICOS
+#%%
+#cantidad de sedes por region geografica
 #buscamos la cantidad de sedes por regiones
 sedes_por_codigo_pais=sql^ """SELECT DISTINCT pais_iso_3, COUNT(sede_id) AS cantidad_de_sedes
                                 FROM sedes GROUP BY pais_iso_3 """
