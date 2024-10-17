@@ -372,6 +372,8 @@ dataframe_resultado_i=sql^ """SELECT DISTINCT spp.pais,spp.sedes,spp.secciones /
                             INNER JOIN flujo_migratorio_neto AS fmn ON spp.pais=fmn.pais
                             ORDER BY spp.sedes DESC, spp.pais ASC"""
 
+dataframe_resultado_i.to_csv('/Users/Usuario/Downloads/Tp_Labo/consulta_1.csv', index=False)
+
 #%% Consulta ii)
 
 paises_con_sedes_argentinas=sql^"""SELECT DISTINCT pais_iso_3 FROM sedes"""
@@ -400,6 +402,8 @@ dataframe_resultado_ii=sql^ """SELECT DISTINCT fepg.region_geografica AS 'region
                             ON r.region_geografica=fepg.region_geografica
                             ORDER BY "Promedio flujo con Argentina - Países con Sedes Argentinas" DESC""" 
                             
+                            
+dataframe_resultado_ii.to_csv('/Users/Usuario/Downloads/Tp_Labo/consulta_2.csv', index=False)
 #%% Consulta iii)
 redes_por_sedes=sql^"""SELECT DISTINCT sede_id, CASE WHEN url LIKE '%facebook%' THEN 'facebook' ELSE
                        CASE WHEN url LIKE '%Facebook%' THEN 'facebook' ELSE
@@ -422,7 +426,8 @@ dataframe_resultado_iii=sql^"""SELECT DISTINCT sp.pais, COUNT(DISTINCT rps.red) 
                            INNER JOIN sedes_paises AS sp ON rps.sede_id=sp.sede_id 
                            WHERE rps.red IS NOT NULL
                            GROUP BY sp.pais """
-
+                           
+dataframe_resultado_iii.to_csv('/Users/Usuario/Downloads/Tp_Labo/consulta_3.csv', index=False)
 #%% Consulta iv)
 redes_por_sedes_2=sql^"""SELECT DISTINCT sede_id, CASE WHEN url LIKE '%facebook%' THEN 'facebook' ELSE
                        CASE WHEN url LIKE '%Facebook%' THEN 'facebook' ELSE
@@ -442,7 +447,7 @@ dataframe_resultado_iv=sql^"""SELECT DISTINCT sp.pais, rps.sede_id, rps.red, rps
                            WHERE rps.red IS NOT NULL 
                            ORDER BY sp.pais ASC, rps.sede_id ASC, rps.red ASC, rps.url ASC """
                            
-
+dataframe_resultado_iv.to_csv('/Users/Usuario/Downloads/Tp_Labo/consulta_4.csv', index=False)
 
 #%%===========================================================================
 # GRAFICOS
