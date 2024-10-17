@@ -11,7 +11,9 @@ from inline_sql import sql,sql_val
 import matplotlib.pyplot as plt
 import numpy as np
 
-#%% IMPORTACIÓN DE LAS BASES DE DATOS
+#%%===========================================================================
+# IMPORTACIÓN DE LAS BASES DE DATOS
+#=============================================================================
 
 #DATOS SEDES
 carpeta = "/Users/Usuario/Downloads/Tp_Labo/"
@@ -23,7 +25,11 @@ datos_secciones=pd.read_csv(carpeta+"Datos_sedes_secciones.csv")
 #DATOS MIGRACIONES
 datos_migraciones=pd.read_csv(carpeta+"datos_migraciones.csv")
 
-#%% FILTRADO DE DATOS
+
+#%%===========================================================================
+# FILTRADO DE DATOS
+#=============================================================================
+
 
 datos_basicos=sql^ """SELECT DISTINCT sede_id, pais_iso_3, UPPER(pais_castellano) as pais_castellano
                       FROM datos_basicos """
@@ -37,7 +43,6 @@ datos_basicos=sql^ """SELECT s.sede_id, s.pais_iso_3,
                       FROM datos_basicos AS s LEFT OUTER JOIN datos_secciones AS sec ON s.sede_id=sec.sede_id"""
 
 #renombramos las columnas de datos_migraciones 
-
 datos_migraciones.rename(columns={'Country Origin Code': 'origen',
                           'Migration by Gender Code': 'genero',
                           'Country Dest Code':'destino',
@@ -49,7 +54,11 @@ datos_migraciones.rename(columns={'Country Origin Code': 'origen',
 
 datos_migraciones=sql^ """SELECT DISTINCT origen, destino, casos_1960,casos_1970,casos_1980,casos_1990,casos_2000 
                           FROM datos_migraciones WHERE genero='TOT'"""
-#%% ANÁLISIS- CALIDAD DE DATOS
+                          
+
+#%%===========================================================================
+# ANÁLISIS- CALIDAD DE DATOS
+#=============================================================================
 
 #DATOS MIGRACIONES. METODO GQM
 #Goal: que los datos correspondientes a las columnas de casos por año posean datos de tipo numerico. 
@@ -80,8 +89,9 @@ null_secciones=(sql^ """Select cantidad_secciones FROM datos_basicos WHERE canti
 metrica_secciones=null_secciones/datos_basicos.shape[0]*100
 
 
-#%% MEJORA DE CALIDAD DE DATOS- TRATAMIENTO DE NULLS
-
+#%%===========================================================================
+# MEJORA DE CALIDAD DE DATOS- TRATAMIENTO DE NULLS
+#=============================================================================
 #DATOS MIGRACIONES.
 #remplazamos los nulls expresados como .. por 0
 for index,rows in null_migraciones.iterrows():
@@ -128,8 +138,10 @@ null_secciones=(sql^ """Select cantidad_secciones FROM datos_basicos WHERE canti
 metrica_secciones=null_secciones/datos_basicos.shape[0]
 
 
-#%% MEJORA DE CALIDAD DE DATOS- ATRIBUTOS COMPUESTOS A ATÓMICOS
 
+#%%===========================================================================
+# MEJORA DE CALIDAD DE DATOS- ATRIBUTOS COMPUESTOS A ATÓMICOS
+#=============================================================================
 #DATOS COMPLETOS - COLUMNA redes_sociales
 
 indexes=[] #futuras columnas del df
@@ -176,7 +188,11 @@ dict_sede_red_social : dict={'sede_id': indexes ,'url' : redes}
 
 red_social=pd.DataFrame(dict_sede_red_social)
 
-#%% FILTRADO DE DATOS DEL DATAFRAME red_social
+
+
+#%%===========================================================================
+# FILTRADO DE DATOS DEL DATAFRAME red_social
+#=============================================================================
 #%% FILTRO 1
 #filtramos aquellas filas del dataFrame red_social donde el valor de la columna url no tiene una url "explicita" y
 #tiene como valor un nombre de usuario donde la primera letra es el simbolo @ y las quitamos del dataFrame red_social. 
@@ -305,24 +321,31 @@ red_social_3 = red_social_3[~((red_social_3['sede_id'] == sede_a_eliminar_5) & (
 #concatenamos los 3 dataFrames
 red_social = pd.concat([red_social, red_social_2, red_social_3], ignore_index=True)
 
-#%% CONSTRUCCION DE NUESTRA BASE DE DATOS SEGUN EL DER
 
+#%%===========================================================================
+# CONSTRUCCION DE NUESTRA BASE DE DATOS SEGUN EL DER
+#=============================================================================
 #red_social lo armamos en la celda anterior
 flujos_migratorios= datos_migraciones
 sedes=sql^ """SELECT DISTINCT db.sede_id, db.pais_iso_3 ,db.pais_castellano AS pais, 
             dc.region_geografica,db.cantidad_secciones 
             FROM datos_basicos AS db INNER JOIN datos_completos AS dc ON db.sede_id=dc.sede_id"""
 
-#%% PASAMOS EL MODELO RELACIONAL A 3FN
 
+
+#%%===========================================================================
+# PASAMOS EL MODELO RELACIONAL A 3FN
+#=============================================================================
 codigos_paises=sql^"""SELECT DISTINCT pais_iso_3, pais FROM sedes"""
 ubicacion=sql^"""SELECT DISTINCT pais_iso_3, region_geografica FROM sedes"""
 sedes=sql^"""SELECT DISTINCT sede_id, pais_iso_3,cantidad_secciones FROM sedes"""
 
 
-#%% CONSULTAS
+#%%===========================================================================
+# CONSULTAS
+#=============================================================================
 #%%
-#Consultas SQL i
+#Consulta i)
 #contamos la cantidad de sedes argentinas en cada pais y la suma de sus secciones
 sedes_por_paises=sql^"""SELECT DISTINCT cp.pais, COUNT(s.sede_id) AS sedes,
                             SUM(CAST(s.cantidad_secciones AS INTEGER)) as secciones
@@ -349,7 +372,7 @@ dataframe_resultado_i=sql^ """SELECT DISTINCT spp.pais,spp.sedes,spp.secciones /
                             INNER JOIN flujo_migratorio_neto AS fmn ON spp.pais=fmn.pais
                             ORDER BY spp.sedes DESC, spp.pais ASC"""
 
-#%% Ejercicio Consultas SQL ii
+#%% Consulta ii)
 
 paises_con_sedes_argentinas=sql^"""SELECT DISTINCT pais_iso_3 FROM sedes"""
 
@@ -369,7 +392,7 @@ flujo_emigrantes_por_regiones=sql^ """SELECT DISTINCT u.region_geografica, SUM(f
                                       INNER JOIN ubicacion AS u ON fepp.pais_iso_3=u.pais_iso_3
                                       GROUP BY u.region_geografica"""
                                       
-#unimos los datos previamente calculado, les ponemos el nombre y ordenamos como en la consigna
+#unimos los datos previamente calculado, les ponemos el nombre y ordenamos como pedia la consigna
 dataframe_resultado_ii=sql^ """SELECT DISTINCT fepg.region_geografica AS 'region geografica', 
                             r.paises AS 'Paises Con Sedes Argentinas',
                             fepg.flujo_regional/r.paises AS 'Promedio flujo con Argentina - Países con Sedes Argentinas'
@@ -377,7 +400,7 @@ dataframe_resultado_ii=sql^ """SELECT DISTINCT fepg.region_geografica AS 'region
                             ON r.region_geografica=fepg.region_geografica
                             ORDER BY "Promedio flujo con Argentina - Países con Sedes Argentinas" DESC""" 
                             
-#%% Ejercicio Consultas SQL iii
+#%% Consulta iii)
 redes_por_sedes=sql^"""SELECT DISTINCT sede_id, CASE WHEN url LIKE '%facebook%' THEN 'facebook' ELSE
                        CASE WHEN url LIKE '%Facebook%' THEN 'facebook' ELSE
                        CASE WHEN url LIKE '%instagram%' THEN 'instragram' ELSE 
@@ -393,14 +416,14 @@ sedes_paises=sql^"""SELECT DISTINCT cp.pais, rps.sede_id FROM redes_por_sedes AS
                 INNER JOIN sedes AS s ON rps.sede_id=s.sede_id  
                 INNER JOIN codigos_paises AS cp ON s.pais_iso_3=cp.pais_iso_3"""
 
-#unimos los datos previamente calculado, les ponemos el nombre y ordenamos como en la consigna
+#unimos los datos previamente calculado, les ponemos el nombre y ordenamos como pedia la consigna
 dataframe_resultado_iii=sql^"""SELECT DISTINCT sp.pais, COUNT(DISTINCT rps.red) AS 'redes distintas' 
                            FROM redes_por_sedes AS rps
                            INNER JOIN sedes_paises AS sp ON rps.sede_id=sp.sede_id 
                            WHERE rps.red IS NOT NULL
                            GROUP BY sp.pais """
 
-#%% Ejercicio Consultass SQL iv
+#%% Consulta iv)
 redes_por_sedes_2=sql^"""SELECT DISTINCT sede_id, CASE WHEN url LIKE '%facebook%' THEN 'facebook' ELSE
                        CASE WHEN url LIKE '%Facebook%' THEN 'facebook' ELSE
                        CASE WHEN url LIKE '%instagram%' THEN 'instragram' ELSE 
@@ -419,9 +442,14 @@ dataframe_resultado_iv=sql^"""SELECT DISTINCT sp.pais, rps.sede_id, rps.red, rps
                            WHERE rps.red IS NOT NULL 
                            ORDER BY sp.pais ASC, rps.sede_id ASC, rps.red ASC, rps.url ASC """
                            
-#%%GRAFICOS
+
+
+#%%===========================================================================
+# GRAFICOS
+#=============================================================================
 #%%
-#cantidad de sedes por region geografica
+# Grafico i)Cantidad de sedes por región geográfica
+
 #buscamos la cantidad de sedes por regiones
 sedes_por_codigo_pais=sql^ """SELECT DISTINCT pais_iso_3, COUNT(sede_id) AS cantidad_de_sedes
                                 FROM sedes GROUP BY pais_iso_3 """
@@ -447,7 +475,7 @@ ax.set_title('Cantidad de sedes por región geográfica',fontsize=19)
 ax.legend()
 fig.tight_layout() #ajusta el tamaño del figure para que las etiquetas entren bien
 
-#%%Grafico cantidad de flujo migratorio promedio por region
+#%%Grafico ii)Cantidad de flujo migratorio promedio por region
 #Hacemos una tabla con origenes y destinos con sedes argentinas
 paises_objetivo=sql^ """SELECT DISTINCT origen,destino FROM flujos_migratorios
                         INNER JOIN paises_con_sedes_argentinas ON origen=pais_iso_3 
@@ -539,7 +567,7 @@ plt.xticks(rotation=30)
 plt.tight_layout()
 ax.legend()
 
-#%% graficos flujos migratorios hacia argentina en el año 2000 y cantidad de sedes
+#%% Grafico iii)Flujos migratorios hacia argentina en el año 2000 y cantidad de sedes
 
 
 
