@@ -1,4 +1,4 @@
-#%% Import y datos crudos
+^#%% Import y datos crudos
 #!/usr/bin/env python3
 
 # -*- coding: utf-8 -*-
@@ -51,7 +51,7 @@ datos_migraciones.rename(columns={'Country Origin Code': 'origen',
 
 datos_migraciones=sql^ """SELECT DISTINCT origen, destino, casos_1960,casos_1970,casos_1980,casos_1990,casos_2000 
                           FROM datos_migraciones WHERE genero='TOT'"""
-#%% CALIDAD DE DATOS
+#%% ANÁLISIS- CALIDAD DE DATOS
 
 #DATOS MIGRACIONES. METODO GQM
 #Goal: que los datos correspondientes a las columnas de casos por año posean datos de tipo numerico. 
@@ -82,7 +82,7 @@ null_secciones=(sql^ """Select cantidad_secciones FROM datos_basicos WHERE canti
 metrica_secciones=null_secciones/datos_basicos.shape[0]*100
 
 
-#%% TRATAMIENTO DE NULLS
+#%% MEJORA DE CALIDAD DE DATOS- TRATAMIENTO DE NULLS
 
 #DATOS MIGRACIONES.
 #remplazamos los nulls expresados como .. por 0
@@ -130,9 +130,9 @@ null_secciones=(sql^ """Select cantidad_secciones FROM datos_basicos WHERE canti
 metrica_secciones=null_secciones/datos_basicos.shape[0]
 
 
-#%% MEJORA DE CALIDAD DE DATOS
+#%% MEJORA DE CALIDAD DE DATOS- ATRIBUTOS COMPUESTOS A ATÓMICOS
 
-#DATOS COMPLETOS: COLUMNA "redes_sociales". 
+#DATOS COMPLETOS - COLUMNA redes_sociales
 
 indexes=[] #futuras columnas del df
 redes=[]  #futuras columnas del df
@@ -178,27 +178,33 @@ dict_sede_red_social : dict={'sede_id': indexes ,'url' : redes}
 
 red_social=pd.DataFrame(dict_sede_red_social)
 
-#FILTRADO DE DATOS DEL DATAFRAME red_social
-
-#filtro aquellas filas del dataFrame red_social donde el valor de la columna url no tiene una url "explicita" y
-#tiene como valor uno donde la primera posicion sea el simbolo @.
+#%% FILTRADO DE DATOS DEL DATAFRAME red_social
+#%% FILTRO 1
+#filtramos aquellas filas del dataFrame red_social donde el valor de la columna url no tiene una url "explicita" y
+#tiene como valor un nombre de usuario donde la primera letra es el simbolo @ y las quitamos del dataFrame red_social. 
 
 red_social_2 = sql^ """Select sede_id, url
             From red_social 
             Where url Like '@%'
             """
-            
-#convertimos los @ a url de instagram
+red_social = sql^ """
+            SELECT rs.sede_id, rs.url
+            FROM red_social AS rs
+            LEFT JOIN red_social_2 AS r2 ON rs.sede_id = r2.sede_id AND rs.url = r2.url
+            WHERE r2.sede_id IS NULL
+            """
+#convertimos los nombre de usuarios de instagram a url 
 def convertir_a_url_instagram(url):
     if url in [
     "@embajada_argentina_en_bolivia",
-     "@embargen", 
+     "@embargenqatar", 
      "@consuladoargentinoensalto", 
      "@argennicaragua",
      "@arg_clang",
      "@consuladoargentinoenroma", 
      "@argenflorianopolis", 
-     "@argentinaindonesia"] :
+     "@argentinaindonesia", 
+     "@embargenturquia"] :
         
         return f'https://instagram.com/{url[1:]}'
     else:
@@ -207,7 +213,7 @@ def convertir_a_url_instagram(url):
 #aplicamos la función a la columna url
 red_social_2['url'] = red_social_2['url'].apply(convertir_a_url_instagram)
 
-##convertimos los @ a url de facebook
+##convertimos los nombres de usuario de facebook a url
 def convertir_a_url_facebook(url):
     if url in [
             "@EmbajadaArgentinaBolivia", 
@@ -225,7 +231,7 @@ def convertir_a_url_facebook(url):
 #aplicamos la función a la columna url
 red_social_2['url'] = red_social_2['url'].apply(convertir_a_url_facebook)
 
-#convertimos los @ a url de twitter
+#convertimos los nombre de usuarios de twitter a url
 def convertir_a_url_twitter(url):
     if url in [
             "@ArEthiopia",
@@ -244,12 +250,18 @@ def convertir_a_url_twitter(url):
 #aplico la función a la columna url
 red_social_2['url'] = red_social_2['url'].apply(convertir_a_url_twitter)
 
-#borramos aquellas filas donde la red social no refleja un dato de la realidad (para mejorar la calidad de nuestros datos)
-indices= [3,14]
-red_social_2 = red_social_2.drop(index= indices)
+#borramos aquellas filas que tiene como url un dato no existente en la realidad
+sede_a_eliminar_1 = "CASUN"
+url_a_eliminar_1 = "@ArgentinaEnAsuncion"
+sede_a_eliminar_2 = "EHOND"
+url_a_eliminar_2= "@ArgHonduras"
 
-#filtro aquellas filas del dataFrame red_social donde el valor de la columna url no tiene una url "explicita" y
-#tiene como valor algo que no posea el simbolo @, o "https" o "/".
+red_social_2 = red_social_2[~((red_social_2['sede_id'] == sede_a_eliminar_1) & (red_social_2['url'] == url_a_eliminar_1))]
+red_social_2 = red_social_2[~((red_social_2['sede_id'] == sede_a_eliminar_2) & (red_social_2['url'] == url_a_eliminar_2))]
+
+#%% FILTRO 2
+#filtramos aquellas filas del dataFrame red_social donde el valor de la columna url no tiene una url "explicita" y
+#tiene como valor algo que no posea el simbolo @, o "https" o "/" y las quitamos del dataFrame red_social.
 red_social_3 = sql^ """
     SELECT sede_id, url
     FROM red_social
@@ -257,6 +269,12 @@ red_social_3 = sql^ """
       AND url NOT LIKE '%https%' 
       AND url NOT LIKE '%/%'
 """
+red_social = sql^ """
+            SELECT rs.sede_id, rs.url
+            FROM red_social AS rs
+            LEFT JOIN red_social_3 AS r3 ON rs.sede_id = r3.sede_id AND rs.url = r3.url
+            WHERE r3.sede_id IS NULL
+            """
 #convertimos a url los datos que pueden ser convertidos bajo nuestro criterio y analisis
 def convertir_a_url_instagram_2(url):
     if url in [
@@ -274,17 +292,19 @@ def convertir_a_url_instagram_2(url):
 #aplicamos la función a la columna url
 red_social_3['url'] = red_social_3['url'].apply(convertir_a_url_instagram_2)
 #borramos aquellas filas donde la red social no refleja un dato de la realidad (para mejorar la calidad de nuestros datos)
-indices_2 = [1,2,7]
-red_social_3 = red_social_3.drop(index= indices_2)
+sede_a_eliminar_3 = "CSCRS"
+url_a_eliminar_3 = "cscrs2018"
+sede_a_eliminar_4 = "CBARC"
+url_a_eliminar_4= "Consulado%20%20Argentino%20%20en%20%20Barcelona"
+sede_a_eliminar_5 = "EHOND"
+url_a_eliminar_5 = "Embajada%20%20Argentina%20%20en%20%20Honduras"
 
-#borramos aquellas filas del dataFrame red_social filas que se encuentran en los dataFrames "red_social_2" y "red_social_3"
-red_social = sql^ """SELECT sede_id, url
-         FROM red_social
-       WHERE url NOT LIKE '%@%' 
-      AND url LIKE '%https%' 
-      AND url LIKE '%.com%' """
+red_social_3 = red_social_3[~((red_social_3['sede_id'] == sede_a_eliminar_3) & (red_social_3['url'] == url_a_eliminar_3))]
+red_social_3 = red_social_3[~((red_social_3['sede_id'] == sede_a_eliminar_4) & (red_social_3['url'] == url_a_eliminar_4))]
+red_social_3 = red_social_3[~((red_social_3['sede_id'] == sede_a_eliminar_5) & (red_social_3['url'] == url_a_eliminar_5))]
 
-#concatenamos los  3 dataFrames
+#%% FILTRO FINAL
+#concatenamos los 3 dataFrames
 red_social = pd.concat([red_social, red_social_2, red_social_3], ignore_index=True)
 
 #%% CONSTRUCCION DE NUESTRA BASE DE DATOS SEGUN EL DER
@@ -359,18 +379,21 @@ dataframe_resultado_ii=sql^ """SELECT DISTINCT fepg.region_geografica AS 'region
                             ORDER BY "Promedio flujo con Argentina - Países con Sedes Argentinas" DESC""" 
                             
 #%% Ejercicio Consultas SQL iii
-# no son todas pero hay un buen cubrimiento
 redes_por_sedes=sql^"""SELECT DISTINCT sede_id, CASE WHEN url LIKE '%facebook%' THEN 'facebook' ELSE
+                       CASE WHEN url LIKE '%Facebook%' THEN 'facebook' ELSE
                        CASE WHEN url LIKE '%instagram%' THEN 'instragram' ELSE 
+                       CASE WHEN url LIKE '%Instagram%' THEN 'instagram' ELSE
                        CASE WHEN url LIKE '%twitter%' THEN 'twitter' ELSE
                        CASE WHEN url LIKE '%youtube%' THEN 'youtube' ELSE
-                       CASE WHEN url LIKE '%linkedin%' THEN 'linkedin' END END END END END AS red FROM red_social """ 
+                       CASE WHEN url LIKE '%linkedin%' THEN 'linkedin' ELSE
+                       CASE WHEN url LIKE '%gmail%' THEN 'gmail' ELSE
+                       CASE WHEN url LIKE '%flickr%' THEN 'flickr' END END END END END END END END END AS red FROM red_social """ 
 
 #unimos las sedes con sus respectivos paises
 sedes_paises=sql^"""SELECT DISTINCT cp.pais, rps.sede_id FROM redes_por_sedes AS rps
                 INNER JOIN sedes AS s ON rps.sede_id=s.sede_id  
                 INNER JOIN codigos_paises AS cp ON s.pais_iso_3=cp.pais_iso_3"""
-#Hay nulls porque no identificamos todas las redes sociales
+
 #unimos los datos previamente calculado, les ponemos el nombre y ordenamos como en la consigna
 dataframe_resultado_iii=sql^"""SELECT DISTINCT sp.pais, COUNT(DISTINCT rps.red) AS 'redes distintas' 
                            FROM redes_por_sedes AS rps
@@ -379,17 +402,20 @@ dataframe_resultado_iii=sql^"""SELECT DISTINCT sp.pais, COUNT(DISTINCT rps.red) 
                            GROUP BY sp.pais """
 
 #%% Ejercicio Consultass SQL iv
-#similar al punto anterior pero añadimos las url
-redes_por_sedes=sql^"""SELECT DISTINCT sede_id, CASE WHEN url LIKE '%facebook%' THEN 'facebook' ELSE
+redes_por_sedes_2=sql^"""SELECT DISTINCT sede_id, CASE WHEN url LIKE '%facebook%' THEN 'facebook' ELSE
+                       CASE WHEN url LIKE '%Facebook%' THEN 'facebook' ELSE
                        CASE WHEN url LIKE '%instagram%' THEN 'instragram' ELSE 
+                       CASE WHEN url LIKE '%Instagram%' THEN 'instagram' ELSE
                        CASE WHEN url LIKE '%twitter%' THEN 'twitter' ELSE
-                       CASE WHEN url LIKE '%youtube%' THEN 'youtube'  END END END END AS red,url
-                       FROM red_social """
-                       
+                       CASE WHEN url LIKE '%youtube%' THEN 'youtube' ELSE
+                       CASE WHEN url LIKE '%linkedin%' THEN 'linkedin' ELSE
+                       CASE WHEN url LIKE '%gmail%' THEN 'gmail' ELSE
+                       CASE WHEN url LIKE '%flickr%' THEN 'flickr' END END END END END END END END END AS red, url FROM red_social """ 
+                     
 #reutilizamos la tabla sedes_paises del ejercicio anterior           
 
 dataframe_resultado_iv=sql^"""SELECT DISTINCT sp.pais, rps.sede_id, rps.red, rps.url 
-                           FROM redes_por_sedes AS rps 
+                           FROM redes_por_sedes_2 AS rps 
                            INNER JOIN sedes_paises AS sp ON rps.sede_id=sp.sede_id
                            WHERE rps.red IS NOT NULL 
                            ORDER BY sp.pais ASC, rps.sede_id ASC, rps.red ASC, rps.url ASC """
